@@ -1,0 +1,46 @@
+name: 投資記事 毎日自動投稿
+
+on:
+  schedule:
+    # 毎日 JST 07:00 (UTC 22:00 前日)
+    - cron: "0 22 * * *"
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Chrome インストール
+        uses: browser-actions/setup-chrome@v1
+
+      - name: 依存パッケージインストール
+        run: pip install -r requirements.txt
+
+      - name: パイプライン実行
+        env:
+          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTE_EMAIL:        ${{ secrets.NOTE_EMAIL }}
+          NOTE_PASSWORD:     ${{ secrets.NOTE_PASSWORD }}
+          HEADLESS:          "true"
+        run: |
+          cd src
+          python main.py
+
+      - name: 生成記事をアーティファクトとして保存
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-article-${{ github.run_number }}
+          path: output/
+          retention-days: 30
