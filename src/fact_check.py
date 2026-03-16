@@ -1,19 +1,16 @@
 """
-③ Claude API で添削・肉付け
-Gemini ドラフトを Claude でファクトチェック・文体調整する
+③ Claude CLI で添削・肉付け
+Gemini ドラフトを Claude CLI 経由でファクトチェック・文体調整する（APIキー不要）
 """
 
 import json
 import os
-import anthropic
-
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+import subprocess
+import tempfile
 
 
 def fact_check_and_polish(draft: str, articles: list[dict]) -> str:
-    """Claude API でファクトチェック・添削"""
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
+    """Claude CLI でファクトチェック・添削"""
     sources_text = "\n".join(f"- {a['url']}" for a in articles if a.get("url"))
 
     prompt = f"""以下はAIが生成した投資解説記事のドラフトです。
@@ -47,14 +44,35 @@ def fact_check_and_polish(draft: str, articles: list[dict]) -> str:
 
 改善後の記事本文のみを出力してください（コメントや説明は不要）。"""
 
-    print("  Claude で添削・肉付け中...")
-    message = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    # Claude CLI が使えるか確認
+    claude_available = subprocess.run(
+        ["which", "claude"], capture_output=True
+    ).returncode == 0
 
-    polished = message.content[0].text
+    if claude_available:
+        print("  Claude CLI で添削・肉付け中...")
+        result = subprocess.run(
+            ["claude", "-p", prompt, "--output-format", "text"],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            polished = result.stdout.strip()
+            print(f"  添削完了（{len(polished)} 文字）")
+            return polished
+        print("  [WARN] Claude CLI 失敗。Gemini にフォールバック")
+
+    # Gemini フォールバック
+    from google import genai
+    from google.genai import types
+    GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+    print("  Gemini で添削・肉付け中...")
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0.5, max_output_tokens=4096),
+    )
+    polished = response.text
     print(f"  添削完了（{len(polished)} 文字）")
     return polished
 

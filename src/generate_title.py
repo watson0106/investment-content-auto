@@ -1,19 +1,15 @@
 """
 ⑤ クリックされるタイトル生成
-記事内容をもとに note 向けの魅力的なタイトル候補を生成する
+記事内容をもとに note 向けの魅力的なタイトル候補を生成する（Claude CLI 使用・APIキー不要）
 """
 
 import json
 import os
-import anthropic
-
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+import subprocess
 
 
 def generate_titles(article_text: str) -> list[str]:
-    """Claude API でタイトル候補を生成"""
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
+    """Claude CLI でタイトル候補を生成"""
     prompt = f"""以下の投資解説記事に対して、note.com で多くの読者にクリックされるタイトルを10案生成してください。
 
 【記事冒頭（参考）】
@@ -37,14 +33,30 @@ def generate_titles(article_text: str) -> list[str]:
 
 タイトル候補のみを出力してください。"""
 
-    print("  Claude でタイトル生成中...")
-    message = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    # Claude CLI が使えるか確認
+    claude_available = subprocess.run(["which", "claude"], capture_output=True).returncode == 0
 
-    text = message.content[0].text
+    text = ""
+    if claude_available:
+        print("  Claude CLI でタイトル生成中...")
+        result = subprocess.run(
+            ["claude", "-p", prompt, "--output-format", "text"],
+            capture_output=True, text=True, timeout=60
+        )
+        text = result.stdout.strip() if result.returncode == 0 else ""
+
+    if not text:
+        # Gemini フォールバック
+        from google import genai
+        from google.genai import types
+        print("  Gemini でタイトル生成中...")
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.8, max_output_tokens=1024),
+        )
+        text = response.text.strip()
     lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
 
     # 番号付きリストをパース
