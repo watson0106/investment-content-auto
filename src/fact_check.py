@@ -54,9 +54,11 @@ def fact_check_and_polish(draft: str, articles: list[dict]) -> str:
 
     if claude_available:
         print("  Claude CLI で添削・肉付け中...")
+        # CLAUDECODE 環境変数を unset してネスト起動エラーを回避
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         result = subprocess.run(
             ["claude", "-p", prompt, "--output-format", "text"],
-            capture_output=True, text=True, timeout=120
+            capture_output=True, text=True, timeout=120, env=env
         )
         if result.returncode == 0 and result.stdout.strip():
             polished = result.stdout.strip()

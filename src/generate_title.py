@@ -42,9 +42,10 @@ def generate_titles(article_text: str) -> list[str]:
     text = ""
     if claude_available:
         print("  Claude CLI でタイトル生成中...")
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         result = subprocess.run(
             ["claude", "-p", prompt, "--output-format", "text"],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, text=True, timeout=60, env=env
         )
         text = result.stdout.strip() if result.returncode == 0 else ""
 
