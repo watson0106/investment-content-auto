@@ -36,10 +36,17 @@ def build_driver(headless: bool = True):
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1280,900")
         options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
         if headless:
             options.add_argument("--headless=new")
         service = Service(ChromeDriverManager().install())
-        return webdriver.Chrome(service=service, options=options)
+        driver = webdriver.Chrome(service=service, options=options)
+        # navigator.webdriver を undefined に上書き（WAF回避）
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        })
+        return driver
     else:
         # ローカル: undetected_chromedriver でWAF回避
         import undetected_chromedriver as uc
