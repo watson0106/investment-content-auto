@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import time
-import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -21,13 +20,34 @@ NOTE_PASSWORD = os.environ["NOTE_PASSWORD"]
 
 NOTE_TAGS = ["投資", "米国株", "日本株", "投資情報", "マーケット", "経済", "株式投資", "AI分析"]
 
+# GitHub Actions 環境か判定
+_IS_CI = bool(os.environ.get("GITHUB_ACTIONS"))
 
-def build_driver(headless: bool = True) -> uc.Chrome:
-    options = uc.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1280,900")
-    return uc.Chrome(options=options, headless=headless)
+
+def build_driver(headless: bool = True):
+    if _IS_CI:
+        # GitHub Actions: 通常Selenium + webdriver_manager（別IPなのでWAF回避不要）
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
+        from webdriver_manager.chrome import ChromeDriverManager
+        options = Options()
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1280,900")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        if headless:
+            options.add_argument("--headless=new")
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
+    else:
+        # ローカル: undetected_chromedriver でWAF回避
+        import undetected_chromedriver as uc
+        options = uc.ChromeOptions()
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1280,900")
+        return uc.Chrome(options=options, headless=headless)
 
 
 def login(driver: uc.Chrome, wait: WebDriverWait):
