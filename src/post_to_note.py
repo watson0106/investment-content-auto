@@ -42,10 +42,16 @@ def build_driver(headless: bool = True):
             options.add_argument("--headless=new")
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
-        # navigator.webdriver を undefined に上書き（WAF回避）
-        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        })
+        # selenium-stealth で自動化フィンガープリントを隠す
+        from selenium_stealth import stealth
+        stealth(driver,
+            languages=["ja-JP", "ja"],
+            vendor="Google Inc.",
+            platform="Win32",
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+            fix_hairline=True,
+        )
         return driver
     else:
         # ローカル: undetected_chromedriver でWAF回避
