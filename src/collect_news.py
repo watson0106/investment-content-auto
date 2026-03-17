@@ -3,6 +3,9 @@
 RSS フィードから投資ニュースを収集し、スコアリングしてピックアップする
 """
 
+from __future__ import annotations
+
+
 import feedparser
 import requests
 from bs4 import BeautifulSoup

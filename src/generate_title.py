@@ -3,6 +3,9 @@
 記事内容をもとに note 向けの魅力的なタイトル候補を生成する（Claude CLI 使用・APIキー不要）
 """
 
+from __future__ import annotations
+
+
 import json
 import os
 import subprocess
@@ -52,7 +55,7 @@ def generate_titles(article_text: str) -> list[str]:
         print("  Gemini でタイトル生成中...")
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(temperature=0.8, max_output_tokens=1024),
         )

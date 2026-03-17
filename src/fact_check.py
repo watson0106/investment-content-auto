@@ -3,6 +3,9 @@
 Gemini ドラフトを Claude CLI 経由でファクトチェック・文体調整する（APIキー不要）
 """
 
+from __future__ import annotations
+
+
 import json
 import os
 import subprocess
@@ -68,7 +71,7 @@ def fact_check_and_polish(draft: str, articles: list[dict]) -> str:
     print("  Gemini で添削・肉付け中...")
     client = genai.Client(api_key=GEMINI_API_KEY)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(temperature=0.5, max_output_tokens=4096),
     )

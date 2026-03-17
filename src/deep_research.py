@@ -3,6 +3,9 @@
 収集したニュースを Gemini でまとめて記事ドラフトを生成する
 """
 
+from __future__ import annotations
+
+
 import json
 import os
 from google import genai
@@ -46,7 +49,7 @@ def run_deep_research(articles: list[dict]) -> dict:
 
     print("  Gemini で深掘り分析中...")
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.7,

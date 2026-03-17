@@ -2,9 +2,16 @@
 パイプライン全体を順番に実行するエントリポイント
 """
 
+from __future__ import annotations
+
+
 import sys
 import os
 import traceback
+from dotenv import load_dotenv
+
+# プロジェクトルートの .env を読み込む
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 sys.path.insert(0, os.path.dirname(__file__))
 

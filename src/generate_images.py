@@ -3,6 +3,9 @@
 記事本文を解析し、図表が効果的な箇所に画像を生成・挿入する
 """
 
+from __future__ import annotations
+
+
 import json
 import os
 import base64
@@ -35,7 +38,7 @@ def identify_chart_sections(article_text: str) -> list[dict]:
 JSONのみ出力してください。"""
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(temperature=0.3, max_output_tokens=1024),
     )
@@ -65,7 +68,7 @@ def generate_chart_image(section: dict, index: int) -> str | None:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash-preview-image-generation",
+            model="gemini-3-pro-image-preview",
             contents=image_prompt,
             config=types.GenerateContentConfig(
                 response_modalities=["image", "text"],

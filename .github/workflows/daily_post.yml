@@ -23,16 +23,23 @@ jobs:
       - name: Chrome インストール
         uses: browser-actions/setup-chrome@v1
 
+      - name: Xvfb インストール（仮想ディスプレイ）
+        run: sudo apt-get install -y xvfb
+
       - name: 依存パッケージインストール
         run: pip install -r requirements.txt
 
       - name: パイプライン実行
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NOTE_EMAIL:     ${{ secrets.NOTE_EMAIL }}
           NOTE_PASSWORD:  ${{ secrets.NOTE_PASSWORD }}
-          HEADLESS:       "true"
+          HEADLESS:       "false"
+          DISPLAY:        ":99"
         run: |
+          Xvfb :99 -screen 0 1280x900x24 &
+          sleep 2
           cd src
           python main.py
 
