@@ -182,7 +182,7 @@ def set_editor_content(driver, element, text: str):
     driver.execute_script("document.execCommand('insertText', false, arguments[0])", text)
 
 
-def post_article(title: str, body: str, image_paths: list[str], tags: list[str], headless: bool = True) -> str:
+def post_article(title: str, body: str, image_paths: list[str], tags: list[str], headless: bool = True, cover_path: str | None = None) -> str:
     """note に記事を下書き保存してURLを返す"""
     driver = build_driver(headless=headless)
     wait   = WebDriverWait(driver, 30)
@@ -212,9 +212,9 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         time.sleep(1)
 
         # カバー画像（アイキャッチ）を設定
-        cover_path = os.path.join(os.path.dirname(__file__), "..", "assets", "cover_image.png")
-        cover_path = os.path.abspath(cover_path)
-        if os.path.exists(cover_path):
+        if not cover_path:
+            cover_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "cover_image.png"))
+        if cover_path and os.path.exists(cover_path):
             print("  カバー画像を設定中...")
             try:
                 # アイキャッチ画像アップロードボタンを探してクリック
@@ -317,13 +317,15 @@ def main():
     title       = data["title"]
     body        = data["article"]
     image_paths = data.get("image_paths", [])
+    cover_path  = data.get("cover_path")
 
     print(f"  タイトル: {title}")
     print(f"  本文: {len(body)} 文字")
-    print(f"  画像: {len(image_paths)} 枚")
+    print(f"  本文画像: {len(image_paths)} 枚")
+    print(f"  カバー画像: {cover_path or '固定'}")
 
     headless = os.environ.get("HEADLESS", "true").lower() == "true"
-    url = post_article(title, body, image_paths, NOTE_TAGS, headless=headless)
+    url = post_article(title, body, image_paths, NOTE_TAGS, headless=headless, cover_path=cover_path)
 
     result = {
         "url":   url,

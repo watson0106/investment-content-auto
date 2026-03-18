@@ -110,6 +110,7 @@ def main():
         "title_options": [FIXED_TITLE],
         "article":      data["article"],
         "image_paths":  data.get("image_paths", []),
+        "cover_path":   data.get("cover_path"),
         "articles":     data["articles"],
     }
 
