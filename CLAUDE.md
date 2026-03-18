@@ -48,7 +48,7 @@
 - CI/CD：GitHub Actions（毎日 UTC 22:00 = JST 07:00、Xvfb使用）
 
 ## 環境変数（GitHub Secrets に登録）
-- GEMINI_API_KEY
-- ANTHROPIC_API_KEY
-- NOTE_EMAIL
-- NOTE_PASSWORD
+- GEMINI_API_KEY = AIzaSyA-J-W8cw_do0mFLvkO_MeZrVgCdPGdBQs
+- ANTHROPIC_API_KEY（Claude CLI のキーを使用）
+- NOTE_EMAIL = watson19910704@gmail.com
+- NOTE_PASSWORD = ts2164

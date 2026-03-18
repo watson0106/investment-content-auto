@@ -1,10 +1,10 @@
 """
 ① ニュース収集・ピックアップ
-RSS フィードから投資ニュースを収集し、スコアリングしてピックアップする
+Bloomberg・日経（Nikkei Asia）・ロイター（スクレイピング）・Yahoo Finance・note の
+リアルタイム情報を収集し、Gemini で最も注目度の高い記事を選定する
 """
 
 from __future__ import annotations
-
 
 import feedparser
 import requests
@@ -13,45 +13,40 @@ from datetime import datetime, timezone, timedelta
 import json
 import re
 import os
+from google import genai
+from google.genai import types
 
 JST = timezone(timedelta(hours=9))
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
+    )
+}
+
+# 動作確認済み RSS ソース
 RSS_SOURCES = [
-    {"name": "Reuters Business",    "url": "https://feeds.reuters.com/reuters/businessNews"},
-    {"name": "Reuters Markets",     "url": "https://feeds.reuters.com/reuters/marketsNews"},
-    {"name": "Yahoo Finance",       "url": "https://finance.yahoo.com/news/rssindex"},
-    {"name": "MarketWatch",         "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories"},
-    {"name": "Bloomberg Markets",   "url": "https://feeds.bloomberg.com/markets/news.rss"},
-    {"name": "Seeking Alpha",       "url": "https://seekingalpha.com/feed.xml"},
-    {"name": "Investing.com",       "url": "https://www.investing.com/rss/news.rss"},
-    {"name": "CNBC Top News",       "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"},
-    {"name": "Financial Times",     "url": "https://www.ft.com/rss/home/japanese"},
-    {"name": "日経新聞 マーケット", "url": "https://www.nikkei.com/rss/rss_nikkei_news.rdf"},
+    {"name": "Bloomberg Markets",    "url": "https://feeds.bloomberg.com/markets/news.rss"},
+    {"name": "Bloomberg Technology", "url": "https://feeds.bloomberg.com/technology/news.rss"},
+    {"name": "Nikkei Asia",          "url": "https://asia.nikkei.com/rss/feed/nar"},
+    {"name": "Yahoo Finance",        "url": "https://finance.yahoo.com/news/rssindex"},
+    {"name": "Yahoo Finance Japan",  "url": "https://news.yahoo.co.jp/rss/topics/business.xml"},
+    {"name": "CNBC",                 "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"},
+    {"name": "MarketWatch",          "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories"},
 ]
-
-# 投資関連キーワード（スコアリング用）
-HIGH_IMPACT_KEYWORDS = [
-    "Fed", "FOMC", "interest rate", "inflation", "GDP", "earnings", "revenue",
-    "profit", "guidance", "beat", "miss", "upgrade", "downgrade", "merger",
-    "acquisition", "IPO", "bankruptcy", "recession", "rate cut", "rate hike",
-    "金利", "利下げ", "利上げ", "インフレ", "決算", "GDP", "日銀", "Fed",
-    "S&P", "Nasdaq", "Dow", "NVIDIA", "Apple", "Tesla", "Amazon", "Google",
-    "景気", "株価", "為替", "円安", "円高", "米国株", "日本株", "半導体",
-    "AI", "chip", "tariff", "関税", "trade war",
-]
-
-NOISE_KEYWORDS = ["スポーツ", "芸能", "天気", "ファッション", "レシピ", "旅行"]
 
 
 def fetch_feed(source: dict) -> list[dict]:
     """RSS フィードを取得してパース"""
     try:
-        feed = feedparser.parse(source["url"])
+        feed = feedparser.parse(source["url"], request_headers=HEADERS)
         articles = []
         cutoff = datetime.now(JST) - timedelta(hours=24)
 
         for entry in feed.entries[:30]:
-            # 日時パース
             published = None
             if hasattr(entry, "published_parsed") and entry.published_parsed:
                 published = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc).astimezone(JST)
@@ -61,8 +56,6 @@ def fetch_feed(source: dict) -> list[dict]:
             title   = entry.get("title", "").strip()
             summary = entry.get("summary", entry.get("description", "")).strip()
             link    = entry.get("link", "")
-
-            # HTML タグを除去
             summary = BeautifulSoup(summary, "html.parser").get_text()[:500]
 
             if title:
@@ -80,27 +73,122 @@ def fetch_feed(source: dict) -> list[dict]:
         return []
 
 
-def score_article(article: dict) -> float:
-    """記事の投資関連スコアを計算"""
-    text = (article["title"] + " " + article["summary"]).lower()
+def fetch_reuters_japan(max_articles: int = 20) -> list[dict]:
+    """ロイター日本語版のマーケット記事をスクレイピング"""
+    articles = []
+    pages = [
+        "https://jp.reuters.com/markets/",
+        "https://jp.reuters.com/economy/",
+    ]
+    seen_hrefs = set()
 
-    # ノイズキーワードがあれば低スコア
-    for kw in NOISE_KEYWORDS:
-        if kw.lower() in text:
-            return 0.0
+    for page_url in pages:
+        try:
+            resp = requests.get(page_url, headers=HEADERS, timeout=10)
+            soup = BeautifulSoup(resp.text, "html.parser")
 
-    score = 0.0
-    for kw in HIGH_IMPACT_KEYWORDS:
-        if kw.lower() in text:
-            score += 1.0
+            for a in soup.select("a"):
+                href = a.get("href", "")
+                text = a.get_text(strip=True)
 
-    # タイトルに含まれる場合はボーナス
-    title_lower = article["title"].lower()
-    for kw in HIGH_IMPACT_KEYWORDS:
-        if kw.lower() in title_lower:
-            score += 0.5
+                # 記事URLパターン（英数字ID付き）
+                if not re.search(r"/[A-Z0-9]{10,}", href):
+                    continue
+                if href in seen_hrefs or not text or len(text) < 10:
+                    continue
 
-    return score
+                seen_hrefs.add(href)
+                full_url = href if href.startswith("http") else f"https://jp.reuters.com{href}"
+                articles.append({
+                    "source":    "ロイター",
+                    "title":     text[:200],
+                    "summary":   "",
+                    "url":       full_url,
+                    "published": "",
+                })
+
+                if len(articles) >= max_articles:
+                    break
+        except Exception as e:
+            print(f"  [WARN] ロイター({page_url}): {e}")
+
+    print(f"  ロイター: {len(articles)} 件取得")
+    return articles
+
+
+def fetch_nikkei_web(max_articles: int = 15) -> list[dict]:
+    """日経電子版のマーケット記事をスクレイピング"""
+    articles = []
+    try:
+        resp = requests.get("https://www.nikkei.com/markets/", headers=HEADERS, timeout=10)
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        for a in soup.select("a"):
+            href  = a.get("href", "")
+            title = a.get_text(strip=True)
+            if not title or len(title) < 10:
+                continue
+            if "/article/" not in href and "/news/" not in href:
+                continue
+
+            full_url = href if href.startswith("http") else f"https://www.nikkei.com{href}"
+            articles.append({
+                "source":    "日経新聞",
+                "title":     title[:200],
+                "summary":   "",
+                "url":       full_url,
+                "published": "",
+            })
+            if len(articles) >= max_articles:
+                break
+    except Exception as e:
+        print(f"  [WARN] 日経: {e}")
+
+    print(f"  日経: {len(articles)} 件取得")
+    return articles
+
+
+def fetch_note_trending(max_articles: int = 10) -> list[dict]:
+    """note.com API で投資関連トレンド記事を取得"""
+    articles = []
+    seen = set()
+    queries = ["投資", "米国株", "日本株", "マーケット"]
+
+    for q in queries:
+        try:
+            url = (
+                f"https://note.com/api/v3/searches"
+                f"?context=note&q={requests.utils.quote(q)}&size=5&sort=popular"
+            )
+            resp = requests.get(url, headers=HEADERS, timeout=10)
+            if resp.status_code != 200:
+                continue
+
+            data  = resp.json()
+            notes = data.get("data", {}).get("notes", {}).get("contents", [])
+
+            for note in notes:
+                key   = note.get("key", "")
+                title = note.get("name", "").strip()
+                body  = note.get("body", "") or ""
+                user  = note.get("user", {}).get("urlname", "")
+
+                if not title or key in seen:
+                    continue
+                seen.add(key)
+
+                articles.append({
+                    "source":    "note",
+                    "title":     title[:200],
+                    "summary":   BeautifulSoup(body, "html.parser").get_text()[:300],
+                    "url":       f"https://note.com/{user}/n/{key}",
+                    "published": "",
+                })
+        except Exception as e:
+            print(f"  [WARN] note({q}): {e}")
+
+    print(f"  note: {len(articles)} 件取得")
+    return articles
 
 
 def deduplicate(articles: list[dict]) -> list[dict]:
@@ -110,44 +198,113 @@ def deduplicate(articles: list[dict]) -> list[dict]:
     for art in articles:
         title = re.sub(r"[^\w\s]", "", art["title"].lower())
         words = set(title.split())
-        is_dup = False
-        for s in seen:
-            overlap = len(words & s) / max(len(words | s), 1)
-            if overlap > 0.6:
-                is_dup = True
-                break
+        if not words:
+            continue
+        is_dup = any(
+            len(words & s) / max(len(words | s), 1) > 0.6
+            for s in seen
+        )
         if not is_dup:
             seen.append(words)
             unique.append(art)
     return unique
 
 
+def interleave_by_source(articles: list[dict]) -> list[dict]:
+    """ソースごとに均等にインターリーブして順番の偏りをなくす"""
+    from collections import defaultdict
+    import random
+    buckets: dict[str, list] = defaultdict(list)
+    for a in articles:
+        buckets[a["source"]].append(a)
+    result = []
+    while any(buckets.values()):
+        for src in list(buckets.keys()):
+            if buckets[src]:
+                result.append(buckets[src].pop(0))
+    return result
+
+
+def select_top_with_gemini(articles: list[dict], top_n: int = 10) -> list[dict]:
+    """Gemini で投資家にとって最も注目度の高い記事を選定"""
+    client = genai.Client(api_key=GEMINI_API_KEY)
+
+    # ソースごとにインターリーブして順番の偏りをなくす
+    articles = interleave_by_source(articles)
+
+    article_list = "\n".join(
+        f"{i+1}. [{a['source']}] {a['title']}\n   {a['summary'][:120]}"
+        for i, a in enumerate(articles)
+    )
+
+    prompt = f"""あなたはプロの投資アナリストです。
+以下のニュース一覧から、**本日の投資家にとって最も注目度・市場インパクトが高い記事を{top_n}本**選んでください。
+
+選定基準（優先順）：
+1. 株式市場・為替・金利・経済指標への直接的な影響度が高い
+2. 個人投資家が今日知っておくべき重要ニュース
+3. 複数テーマを組み合わせて深い分析ができる
+4. **必ず複数のソース（Bloomberg・日経・ロイター・Yahoo Finance・note）から選ぶこと**
+   - Bloomberg だけに偏らず、日本語ソース（日経・ロイター・Yahoo Japan・note）を優先的に含める
+   - 日本人投資家の視点で重要なニュースを重視する
+
+【ニュース一覧】
+{article_list}
+
+選んだ記事の番号をJSON配列で出力してください（例：[1, 3, 7, 12, 15]）。
+番号のみ、JSONのみ、説明不要。"""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=256),
+        )
+        text = response.text.strip()
+        match = re.search(r"\[[\d,\s]+\]", text)
+        if match:
+            indices = json.loads(match.group())
+            selected = [articles[i - 1] for i in indices if 1 <= i <= len(articles)]
+            if selected:
+                print(f"  Gemini 選定: {len(selected)} 件")
+                return selected[:top_n]
+    except Exception as e:
+        print(f"  [WARN] Gemini 選定失敗: {e}")
+
+    return articles[:top_n]
+
+
 def collect_and_rank(top_n: int = 10) -> list[dict]:
-    """全ソースからニュースを収集してランキング"""
+    """全ソースからニュースを収集して Gemini で選定"""
     all_articles = []
 
+    # RSS フィード
     for source in RSS_SOURCES:
         print(f"  取得中: {source['name']}")
         articles = fetch_feed(source)
         all_articles.extend(articles)
 
+    # ロイター（スクレイピング）
+    print("  取得中: ロイター日本語版")
+    all_articles.extend(fetch_reuters_japan())
+
+    # 日経（スクレイピング）
+    print("  取得中: 日経新聞")
+    all_articles.extend(fetch_nikkei_web())
+
+    # note トレンド（API）
+    print("  取得中: note トレンド")
+    all_articles.extend(fetch_note_trending())
+
     print(f"  取得合計: {len(all_articles)} 件")
-
-    # スコアリング
-    for art in all_articles:
-        art["score"] = score_article(art)
-
-    # スコア順にソート
-    all_articles.sort(key=lambda x: x["score"], reverse=True)
 
     # 重複除去
     unique = deduplicate(all_articles)
+    print(f"  重複除去後: {len(unique)} 件")
 
-    # スコア > 0 のみ対象
-    filtered = [a for a in unique if a["score"] > 0]
-
-    print(f"  投資関連: {len(filtered)} 件 → 上位 {top_n} 件を選出")
-    return filtered[:top_n]
+    # Gemini で注目度選定
+    print("  Gemini で注目度分析・選定中...")
+    return select_top_with_gemini(unique, top_n=top_n)
 
 
 def main():
@@ -161,7 +318,7 @@ def main():
 
     print(f"\n選出記事 ({len(articles)} 件):")
     for i, a in enumerate(articles, 1):
-        print(f"  {i}. [{a['score']:.1f}] {a['title'][:60]}  ({a['source']})")
+        print(f"  {i}. [{a['source']}] {a['title'][:65]}")
 
     print(f"\n保存: {out_path}")
     return articles

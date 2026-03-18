@@ -1,0 +1,251 @@
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  取得中: Reuters Business
+  取得中: Reuters Markets
+  取得中: Yahoo Finance
+  取得中: MarketWatch
+  取得中: Bloomberg Markets
+  取得中: Seeking Alpha
+  取得中: Investing.com
+  取得中: CNBC Top News
+  取得中: Financial Times
+  取得中: 日経新聞 マーケット
+  取得合計: 112 件
+  投資関連: 55 件 → 上位 10 件を選出
+
+選出記事 (10 件):
+  1. [4.5] The Fed issues its latest interest rate decision Wednesday.   (CNBC Top News)
+  2. [4.5] Airlines raise revenue guidance despite rising fuel costs, c  (CNBC Top News)
+  3. [4.0] Lululemon reports weak guidance as proxy battle, tariffs wei  (CNBC Top News)
+  4. [3.0] AI Drone Software Stock Jumps 520% in Best IPO Since Newsmax  (Bloomberg Markets)
+  5. [3.0] Exxon Mobil: Avoid Being The Latecomer To The Energy Party (  (Seeking Alpha)
+  6. [3.0] OpenAI preps for IPO by end of year, tells employees ChatGPT  (CNBC Top News)
+  7. [3.0] U.S. says it may be forced to shut down some airports over f  (CNBC Top News)
+  8. [2.5] Micron’s stock gains officially carry the company into an ex  (MarketWatch)
+  9. [2.5] Itausa Sees Aegea Valuation Topping $7.8 Billion in Brazil I  (Bloomberg Markets)
+  10. [2.5] Gold Wavers as Traders Weigh Inflation Risks, Oil-Supply Sho  (Bloomberg Markets)
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（3409 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+## AI狂騒曲とマクロ経済の狭間で：市場は選別フェーズへ
+
+今日の市場は、人工知能（AI）ブームが新たな高みへと向かう熱狂と、マクロ経済の不確実性が交錯する複雑な様相を呈しています。新規株式公開（IPO）市場ではAI関連企業の株価が驚異的な急騰を見せる一方で、米連邦準備制度理事会（Fed）の金融政策決定を控え、投資家は慎重な姿勢を崩していません。また、一部の消費関連企業からは弱気な見通しが示され、市場全体がより選別的なフェーズに入りつつある兆候が見られます。
+
+特に注目すべきは、AI関連銘柄の過熱感です。AIドローンソフトウェア企業Swarmer Inc.がIPOで一時700%もの急騰を見せ
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Claude CLI で添削・肉付け中...
+  添削完了（4270 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## AI狂騒曲とマクロ経済の狭間で：市場は選別フェーズへ
+
+今日の市場は、人工知能（AI）ブームへの熱狂と、マクロ経済の不確実性が入り交じる複雑な様相を呈しています。新規株式公開（IPO）市場ではAI関連企業が驚異的な株価急騰を見せる一方で、米連邦準備制度理事会（Fed）の金融政策決定を控えた慎重ムードも漂っています。また、一部の消費関連企業からは弱気な見通しが示され、市場全体がより選別的なフェーズに入りつつあることが示唆されています。
+
+特に注目すべきは、AI関連銘柄への過熱感です。AIドローンソフトウェア企業Swarmer Inc.がIPO初日に一時700%急騰し、最終的に約520%高で
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 画像生成 ===
+  図表箇所を特定中...
+  0 箇所の図表を生成予定
+  0 枚の画像を記事に挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  Claude CLI でタイトル生成中...
+  10 案のタイトルを生成
+
+推奨タイトル: AI株バブル再来？IPO初日+520%の衝撃と今後の市場選別を読む
+
+全候補:
+  ★1. AI株バブル再来？IPO初日+520%の衝撃と今後の市場選別を読む
+   2. FRB決定前夜に知っておきたい：AI熱狂と3つのマクロリスク
+   3. Micron時価総額5000億ドル突破——AI半導体ブームはまだ続くのか
+   4. AI株急騰の裏に潜む危険信号：投資家が今見るべき2つの指標
+   5. FRB・地政学・政府閉鎖——3大リスクが重なる今、米国株はどう動く？
+   6. IPO初日に700%急騰も…AI関連株「選別フェーズ」で生き残る銘柄の条件
+   7. AI熱狂とインフレ圧力が同時進行——2024年市場の分岐点を読む
+   8. 半導体株は買いか？Micron5000億ドル超えが示すAI需要の本質
+   9. FRB金利据え置き濃厚でも楽観できない理由：3つのリスクシナリオ
+   10. AIバブルか本物の成長か——IPO市場が映す米国株の危うい二極化
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: AI株バブル再来？IPO初日+520%の衝撃と今後の市場選別を読む
+  本文: 4270 文字
+  画像: 0 枚
+  note にログイン中...
+  ログイン成功（API）
+  ドラフト作成中...
+  ドラフト作成完了: id=151548425, key=n198e4bdd341b
+  本文更新中（4270 文字）...
+  公開中...
+  公開完了: https://note.com/kawasewatson0106/n/n198e4bdd341b
+
+✅ 投稿成功: https://note.com/kawasewatson0106/n/n198e4bdd341b
+
+==================================================
+✅ パイプライン完了
+==================================================
+投稿URL: https://note.com/kawasewatson0106/n/n198e4bdd341b
+========================================
+実行開始: 2026-03-18 07:00:05
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+Traceback (most recent call last):
+  File "/Users/watson/investment-content-auto/src/main.py", line 45, in run_pipeline
+    func()
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 205, in main
+    url = post_article(title, body, image_paths, NOTE_TAGS, headless=headless)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 132, in post_article
+    login(driver, wait)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 101, in login
+    raise Exception("ログイン失敗。メール・パスワードを確認してください")
+Exception: ログイン失敗。メール・パスワードを確認してください
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  取得中: Reuters Business
+  取得中: Reuters Markets
+  取得中: Yahoo Finance
+  取得中: MarketWatch
+  取得中: Bloomberg Markets
+  取得中: Seeking Alpha
+  取得中: Investing.com
+  取得中: CNBC Top News
+  取得中: Financial Times
+  取得中: 日経新聞 マーケット
+  取得合計: 112 件
+  投資関連: 57 件 → 上位 10 件を選出
+
+選出記事 (10 件):
+  1. [6.5] Traders Dial Back Bets Against Fed Cuts as Growth Worries Bu  (Bloomberg Markets)
+  2. [4.5] Earnings call transcript: HealthEquity Q4 2026 beats EPS & r  (Investing.com)
+  3. [4.5] The Fed issues its latest interest rate decision Wednesday.   (CNBC Top News)
+  4. [4.5] Airlines raise revenue guidance despite rising fuel costs, c  (CNBC Top News)
+  5. [4.0] Lululemon reports weak guidance as proxy battle, tariffs wei  (CNBC Top News)
+  6. [3.0] AI Drone Software Stock Jumps 520% in Best IPO Since Newsmax  (Bloomberg Markets)
+  7. [3.0] Exxon Mobil: Avoid Being The Latecomer To The Energy Party (  (Seeking Alpha)
+  8. [3.0] Earnings call transcript: Lululemon Q4 2025 sees EPS beat, s  (Investing.com)
+  9. [3.0] OpenAI preps for IPO by end of year, tells employees ChatGPT  (CNBC Top News)
+  10. [3.0] U.S. says it may be forced to shut down some airports over f  (CNBC Top News)
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（3937 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+## 利下げ期待後退とAIブームの光と影：市場の複雑な局面にどう向き合うか
+
+今日の市場を読み解く上で最も重要なキーワードは、「米連邦準備制度理事会（FRB）の金融政策の不確実性」と「AIブームの過熱感」です。これまで積極的な利下げを織り込んできた市場ですが、経済成長への懸念とインフレの粘着性が交錯し、利下げ期待が後退しています。一方で、AI関連銘柄の華々しいIPOや大手企業のIPO準備が市場の熱狂を誘い、テクノロジーセクターへの関心は依然として高い水準を保っています。この複雑な局面において、投資家はマクロ経済の動向と個別企業のファンダメンタルズを慎重に見極める必要があります。
+
+### 背景
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Gemini で添削・肉付け中...
+  添削完了（257 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## 利下げ期待後退とAIブームの光と影：市場の複雑な局面にどう向き合うか
+
+現在の市場を読み解く上で最も重要なキーワードは、「米連邦準備制度理事会（FRB）の金融政策の不確実性」と「AIブームの過熱感」です。これまで積極的な利下げを織り込んできた市場ですが、経済成長への懸念とインフレの粘着性が交錯し、利下げ期待が後退しています。一方で、AI関連銘柄の華々しい新規株式公開（IPO）や大手企業のIPO準備が市場の熱狂を誘い、テクノロジーセクターへの関心は依然として高い水準を保っています。この複雑な局面において、
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 画像生成（日本語図表） ===
+  図表箇所を特定中...
+  3 箇所の図表を生成予定
+    [1] FRB政策金利見通しとインフレ率の推移 (line_chart)
+    [2] 主要経済指標の現状と市場予測 (table)
+    [3] 主要セクター別株価パフォーマンス比較 (bar_chart)
+  [1/3] FRB政策金利見通しとインフレ率の推移 生成中...
+  画像生成完了 [gemini-3-pro-image-preview]: output/images/chart_0.png (492KB)
+  [2/3] 主要経済指標の現状と市場予測 生成中...
+  画像生成完了 [gemini-3-pro-image-preview]: output/images/chart_1.png (546KB)
+  [3/3] 主要セクター別株価パフォーマンス比較 生成中...
+  画像生成完了 [gemini-3-pro-image-preview]: output/images/chart_2.png (458KB)
+  3 枚の画像を記事に挿入
+  合計 3 枚の画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  Gemini でタイトル生成中...
+  2 案のタイトルを生成
+
+推奨タイトル: FRBとAIが揺らす米国株！今すぐ知るべき2つの重要ポイント
+
+全候補:
+  ★1. FRBとAIが揺らす米国株！今すぐ知るべき2つの重要ポイント
+   2. 利下げ後退とAI過熱！2024年米国
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: FRBとAIが揺らす米国株！今すぐ知るべき2つの重要ポイント
+  本文: 476 文字
+  画像: 3 枚
+  note にログイン中...
+  API login failed (status=403), フォームで試みる...
+
+❌ ⑥ note 投稿 でエラー発生:

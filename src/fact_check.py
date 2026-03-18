@@ -24,28 +24,26 @@ def fact_check_and_polish(draft: str, articles: list[dict]) -> str:
 【参照ソース】
 {sources_text}
 
-以下の観点で記事を改善してください：
+以下の観点で記事を改善してください（構成は変えずに磨く）：
 
-1. **ファクトチェック**
-   - 数値・パーセンテージ・固有名詞が正確か確認
-   - 不確かな情報には「〜とされる」「〜と報じられている」などの表現を使う
-   - 明らかに誤っている情報は削除または修正する
+1. **文体**
+   - 口語体・ブログ調を維持。「〜なんです」「〜ですよね」「実は〜」を適度に使う
+   - 一文を短く。長い文は分割する
+   - 絵文字は使わない
 
-2. **論理整合性**
-   - 前後の矛盾を修正する
-   - 因果関係が不明確な箇所を補強する
+2. **各ニュースの「私の見方と投資への活かし方」セクション**
+   - 「私は〜と思う」「個人的には〜」の一人称で書く
+   - 具体的なETF名・銘柄名・セクター名を必ず1つ以上挙げる
+   - 「買い」「売り」の断言はせず、「〜に注目したい」「〜を意識したい」という表現にする
 
-3. **文体・読みやすさ（note読者向け）**
-   - 難しい専門用語には括弧で補足を加える
-   - 段落を適切に区切り、読みやすくする
-   - 投資初心者〜中級者が読んで理解できる文体にする
-   - 「です・ます」調で統一する
+3. **ファクトチェック**
+   - 数値・固有名詞が正確か確認
+   - 不確かな情報は「〜と報じられています」「〜とされています」と表現
 
-4. **構成の補完**
-   - 不足している視点（リスク・反対意見・代替シナリオ）を追加する
-   - 読者が「次に何をすべきか」が分かるよう具体的なアクションを含める
+4. **文字数**
+   - 全体で必ず5000文字以上。各ニュースのセクションを十分に掘り下げる
 
-改善後の記事本文のみを出力してください（コメントや説明は不要）。"""
+改善後の記事本文のみを出力してください（説明・コメント不要）。"""
 
     # Claude CLI が使えるか確認
     claude_available = subprocess.run(
@@ -58,7 +56,7 @@ def fact_check_and_polish(draft: str, articles: list[dict]) -> str:
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         result = subprocess.run(
             ["claude", "-p", prompt, "--output-format", "text"],
-            capture_output=True, text=True, timeout=120, env=env
+            capture_output=True, text=True, timeout=300, env=env
         )
         if result.returncode == 0 and result.stdout.strip():
             polished = result.stdout.strip()
@@ -75,7 +73,7 @@ def fact_check_and_polish(draft: str, articles: list[dict]) -> str:
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.5, max_output_tokens=4096),
+        config=types.GenerateContentConfig(temperature=0.5, max_output_tokens=16000),
     )
     polished = response.text
     print(f"  添削完了（{len(polished)} 文字）")

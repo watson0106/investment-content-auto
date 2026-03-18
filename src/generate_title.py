@@ -19,14 +19,13 @@ def generate_titles(article_text: str) -> list[str]:
 {article_text[:1500]}
 
 【タイトル設計のルール】
-- 25〜40字が理想（長すぎず短すぎず）
-- 数字を含める（例：「3つの理由」「+8%上昇」「1000億円規模」）
-- 疑問形・断言・驚き・緊急性のいずれかを使う
-- 専門用語は避け、初心者にも伝わる言葉を選ぶ
-- note の投資カテゴリで目立つキーワードを含める
-  （例：米国株、日本株、ETF、FRB、AI、半導体、円安、配当など）
-- 「〜してみた」「〜だった」のような体験談風は避ける
-- 投資助言・推奨にならないよう「〜の可能性」「〜に注目」などの表現を使う
+- 「このニュースを見た読者が抱く素朴な疑問」をそのままタイトルにする
+- 例：「なぜ日経が700円も上がったの？」「FRBが動かないと株はどうなる？」「円安で得するのは誰？」
+- 疑問形（〜の？/〜なの？/〜するの？）を基本とする
+- 具体的な数字・固有名詞を入れるとなお良い（例：「700円高」「5.5%」「FRB」）
+- 20〜35字以内。長すぎNG
+- 難しい専門用語NG。誰でも読めるひらがな・カタカナ中心
+- 煽り・誇大表現NG
 
 【出力形式】
 1. タイトル案1
@@ -95,25 +94,20 @@ def select_best_title(titles: list[str]) -> str:
     return max(titles, key=score)
 
 
+FIXED_TITLE = "新聞よりわかりやすくて早い今日の投資ニュース速報"
+
+
 def main():
     print("=== ⑤ タイトル生成 ===")
 
     with open("output/article_with_images.json", encoding="utf-8") as f:
         data = json.load(f)
 
-    titles = generate_titles(data["article"])
-
-    best = select_best_title(titles)
-    print(f"\n推奨タイトル: {best}")
-
-    print("\n全候補:")
-    for i, t in enumerate(titles, 1):
-        marker = "★" if t == best else " "
-        print(f"  {marker}{i}. {t}")
+    print(f"  タイトル固定: {FIXED_TITLE}")
 
     result = {
-        "title":        best,
-        "title_options": titles,
+        "title":        FIXED_TITLE,
+        "title_options": [FIXED_TITLE],
         "article":      data["article"],
         "image_paths":  data.get("image_paths", []),
         "articles":     data["articles"],

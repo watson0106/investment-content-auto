@@ -1,14 +1,15 @@
 """
 ⑥ note.com へ自動投稿
-Selenium + JS API で note にログインして記事を投稿する
-（エディタDOM操作ではなく内部APIを直接呼び出す方式）
+Selenium でログインし、画像をAPIでアップロード後、
+エディタDOMを直接操作してタイトル・本文（画像URL埋め込み済み）を下書き保存する
 """
 
 from __future__ import annotations
 
-
 import json
 import os
+import re
+import subprocess
 import time
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -20,13 +21,11 @@ NOTE_PASSWORD = os.environ["NOTE_PASSWORD"]
 
 NOTE_TAGS = ["投資", "米国株", "日本株", "投資情報", "マーケット", "経済", "株式投資", "AI分析"]
 
-# GitHub Actions 環境か判定
 _IS_CI = bool(os.environ.get("GITHUB_ACTIONS"))
 
 
 def build_driver(headless: bool = True):
     if _IS_CI:
-        # GitHub Actions: 通常Selenium + webdriver_manager（別IPなのでWAF回避不要）
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
         from selenium.webdriver.chrome.service import Service
@@ -42,19 +41,12 @@ def build_driver(headless: bool = True):
             options.add_argument("--headless=new")
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
-        # selenium-stealth で自動化フィンガープリントを隠す
         from selenium_stealth import stealth
-        stealth(driver,
-            languages=["ja-JP", "ja"],
-            vendor="Google Inc.",
-            platform="Win32",
-            webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine",
-            fix_hairline=True,
-        )
+        stealth(driver, languages=["ja-JP", "ja"], vendor="Google Inc.",
+                platform="Win32", webgl_vendor="Intel Inc.",
+                renderer="Intel Iris OpenGL Engine", fix_hairline=True)
         return driver
     else:
-        # ローカル: undetected_chromedriver でWAF回避
         import undetected_chromedriver as uc
         options = uc.ChromeOptions()
         options.add_argument("--no-sandbox")
@@ -63,13 +55,10 @@ def build_driver(headless: bool = True):
         return uc.Chrome(options=options, headless=headless)
 
 
-def login(driver: uc.Chrome, wait: WebDriverWait):
+def login(driver, wait: WebDriverWait):
     print("  note にログイン中...")
-    # まず note.com を開いてCookieを初期化
     driver.get("https://note.com/login")
     time.sleep(3)
-
-    # JS fetch で直接セッションAPIを呼び出す（フォーム操作をバイパス）
     driver.set_script_timeout(15)
     result = driver.execute_async_script(f"""
         var done = arguments[arguments.length - 1];
@@ -96,145 +85,223 @@ def login(driver: uc.Chrome, wait: WebDriverWait):
     if result and result.get("status") == 201:
         print("  ログイン成功（API）")
     else:
-        # フォールバック：通常のフォームログイン
         print(f"  API login failed (status={result.get('status') if result else 'None'}), フォームで試みる...")
         email_field = wait.until(EC.presence_of_element_located((By.ID, "email")))
         email_field.clear()
         email_field.send_keys(NOTE_EMAIL)
-
         pw_field = driver.find_element(By.ID, "password")
         pw_field.clear()
         pw_field.send_keys(NOTE_PASSWORD)
         pw_field.send_keys(Keys.RETURN)
-
         for _ in range(10):
             time.sleep(1)
             if "login" not in driver.current_url:
                 break
-
         if "note.com" in driver.current_url and "login" not in driver.current_url:
             print("  ログイン成功（フォーム）")
         else:
-            print(f"  現在URL: {driver.current_url}")
             raise Exception("ログイン失敗。メール・パスワードを確認してください")
 
 
-def api_call(driver: uc.Chrome, url: str, method: str = "GET", body: dict | None = None) -> dict:
-    """ブラウザのJS fetchでnote APIを呼び出す（認証Cookie自動付与）"""
-    driver.set_script_timeout(30)
-    body_str = json.dumps(body) if body else "null"
-    script = f"""
-        var done = arguments[arguments.length - 1];
-        var opts = {{
-            method: '{method}',
-            credentials: 'include',
-            headers: {{
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'x-requested-with': 'XMLHttpRequest'
-            }}
-        }};
-        var bodyData = {body_str};
-        if (bodyData !== null) {{
-            opts.body = JSON.stringify(bodyData);
-        }}
-        fetch('{url}', opts)
-            .then(function(r) {{
-                return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
-            }})
-            .catch(function(e) {{ done({{error: e.toString()}}); }});
-    """
-    return driver.execute_async_script(script)
+def paste_image_from_clipboard(driver, editor_el, image_path: str) -> bool:
+    """osascriptでクリップボードに画像をセットしてエディタにペースト"""
+    try:
+        abs_path = os.path.abspath(image_path)
+        subprocess.run(
+            ["osascript", "-e", f'set the clipboard to POSIX file "{abs_path}"'],
+            check=True
+        )
+        time.sleep(0.8)
+        editor_el.send_keys(Keys.COMMAND + "v")
+        time.sleep(4)  # アップロード完了を待つ
+        return True
+    except Exception as e:
+        print(f"  [WARN] 画像ペースト失敗: {e}")
+        return False
 
 
-def create_draft(driver: uc.Chrome) -> tuple[int, str]:
-    """ドラフト記事を作成してID・keyを返す"""
-    print("  ドラフト作成中...")
-    # editor.note.com へ移動（ここからのfetchが許可される）
-    driver.get("https://note.com/notes/new")
-    time.sleep(6)
-
-    r = api_call(driver, "https://note.com/api/v1/text_notes", "POST", {"template_key": None})
-    if r.get("error"):
-        raise Exception(f"ドラフト作成失敗: {r['error']}")
-    if r.get("status") not in (200, 201):
-        raise Exception(f"ドラフト作成失敗: status={r.get('status')}, body={r.get('text', '')[:200]}")
-
-    data = json.loads(r["text"])["data"]
-    note_id  = data["id"]
-    note_key = data["key"]
-    print(f"  ドラフト作成完了: id={note_id}, key={note_key}")
-    return note_id, note_key
+def set_react_textarea(driver, element, value: str):
+    """React controlled textareaに値をセット"""
+    driver.execute_script("""
+        var el = arguments[0];
+        var setter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype, 'value').set;
+        setter.call(el, arguments[1]);
+        el.dispatchEvent(new Event('input', {bubbles: true}));
+        el.dispatchEvent(new Event('change', {bubbles: true}));
+    """, element, value)
 
 
-def update_note(driver: uc.Chrome, note_id: int, title: str, body_html: str,
-               status: str = "draft", tags: list[str] | None = None) -> dict:
-    """記事タイトル・本文・ステータスを更新"""
-    payload: dict = {
-        "name": title,
-        "body": body_html,
-        "status": status,
-    }
-    if tags:
-        # note は最大5タグ、スペース区切り文字列で渡す
-        payload["hashtag_list"] = " ".join(tags[:5])
-    r = api_call(
-        driver,
-        f"https://note.com/api/v1/text_notes/{note_id}",
-        "PUT",
-        payload
-    )
-    if r.get("error"):
-        raise Exception(f"記事更新失敗: {r['error']}")
-    return json.loads(r["text"]) if r.get("text") else {}
+def clean_inline_markdown(text: str) -> str:
+    """**bold** と *italic* のマークアップを除去"""
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'\*(.+?)\*', r'\1', text, flags=re.DOTALL)
+    return text
 
 
-def markdown_to_html(text: str) -> str:
-    """マークダウンテキストをnote用のシンプルなHTMLに変換"""
-    lines = text.split("\n")
-    html_lines = []
+def insert_section_with_headings(driver, section_text: str):
+    """セクションテキストを挿入（##見出し行はh2書式を適用）"""
+    lines = section_text.split('\n')
+    batch: list[str] = []
+
+    def flush_batch():
+        if not batch:
+            return
+        driver.execute_script(
+            "document.execCommand('insertText', false, arguments[0])",
+            '\n'.join(batch) + '\n'
+        )
+        batch.clear()
+
     for line in lines:
-        if line.startswith("# "):
-            html_lines.append(f"<h1>{line[2:]}</h1>")
-        elif line.startswith("## "):
-            html_lines.append(f"<h2>{line[3:]}</h2>")
-        elif line.startswith("### "):
-            html_lines.append(f"<h3>{line[4:]}</h3>")
-        elif line.strip() == "":
-            html_lines.append("<br>")
+        m = re.match(r'^#{1,3}\s+(.*)', line)
+        if m:
+            flush_batch()
+            heading_text = clean_inline_markdown(m.group(1).strip())
+            # 見出しテキストを挿入 → h2書式を適用 → 改行して通常テキストに戻す
+            driver.execute_script(
+                "document.execCommand('insertText', false, arguments[0])", heading_text
+            )
+            time.sleep(0.1)
+            driver.execute_script("document.execCommand('formatBlock', false, 'h2')")
+            time.sleep(0.1)
+            driver.execute_script("document.execCommand('insertText', false, '\\n')")
+            driver.execute_script("document.execCommand('formatBlock', false, 'p')")
+            time.sleep(0.1)
         else:
-            html_lines.append(f"<p>{line}</p>")
-    return "".join(html_lines)
+            batch.append(clean_inline_markdown(line))
+
+    flush_batch()
+
+
+def set_editor_content(driver, element, text: str):
+    """ProseMirrorエディタにテキストをセット"""
+    element.click()
+    time.sleep(0.5)
+    driver.execute_script("document.execCommand('selectAll', false, null)")
+    driver.execute_script("document.execCommand('insertText', false, arguments[0])", text)
 
 
 def post_article(title: str, body: str, image_paths: list[str], tags: list[str], headless: bool = True) -> str:
-    """note に記事を投稿してURLを返す"""
+    """note に記事を下書き保存してURLを返す"""
     driver = build_driver(headless=headless)
-    wait   = WebDriverWait(driver, 20)
+    wait   = WebDriverWait(driver, 30)
 
     try:
         login(driver, wait)
 
-        note_id, note_key = create_draft(driver)
+        # 新規記事エディタを開く
+        print("  エディタを開いています...")
+        driver.get("https://note.com/notes/new")
+        time.sleep(10)
 
-        # 本文をHTML変換してドラフト保存
-        body_html = markdown_to_html(body[:50000])
-        print(f"  本文更新中（{len(body)} 文字）...")
-        update_note(driver, note_id, title, body_html, status="draft")
+        current = driver.current_url
+        print(f"  エディタURL: {current}")
+        m = re.search(r"/notes/([a-zA-Z0-9]+)/edit", current)
+        if not m:
+            raise Exception(f"エディタにリダイレクトされませんでした: {current}")
+        note_key = m.group(1)
 
-        # 公開（タグも含めて一緒に設定）
-        print("  公開中...")
-        pub_result = update_note(driver, note_id, title, body_html, status="published", tags=tags)
+        # タイトルを入力
+        print(f"  タイトル入力中...")
+        title_el = wait.until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, 'textarea[placeholder="記事タイトル"]')
+        ))
+        title_el.click()
+        set_react_textarea(driver, title_el, title)
+        time.sleep(1)
 
-        # URLを構築
-        urlname = None
-        if pub_result.get("data"):
-            urlname = pub_result["data"].get("user", {}).get("urlname") or "kawasewatson0106"
-        else:
-            urlname = "kawasewatson0106"
+        # カバー画像（アイキャッチ）を設定
+        cover_path = os.path.join(os.path.dirname(__file__), "..", "assets", "cover_image.png")
+        cover_path = os.path.abspath(cover_path)
+        if os.path.exists(cover_path):
+            print("  カバー画像を設定中...")
+            try:
+                # アイキャッチ画像アップロードボタンを探してクリック
+                eyecatch_btn = driver.find_elements(By.XPATH,
+                    "//*[contains(@class,'eyecatch') or contains(text(),'アイキャッチ') or contains(@aria-label,'アイキャッチ')]"
+                )
+                if not eyecatch_btn:
+                    # file inputを直接探す
+                    file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
+                    if file_inputs:
+                        file_inputs[0].send_keys(cover_path)
+                        time.sleep(3)
+                        # トリミングダイアログが出た場合は確定ボタンを押す
+                        try:
+                            confirm = driver.find_element(By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'OK')]")
+                            confirm.click()
+                            time.sleep(2)
+                        except Exception:
+                            pass
+                        print("  カバー画像 設定完了")
+                else:
+                    eyecatch_btn[0].click()
+                    time.sleep(2)
+                    file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
+                    if file_inputs:
+                        file_inputs[-1].send_keys(cover_path)
+                        time.sleep(3)
+                        try:
+                            confirm = driver.find_element(By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'OK')]")
+                            confirm.click()
+                            time.sleep(2)
+                        except Exception:
+                            pass
+                        print("  カバー画像 設定完了")
+            except Exception as e:
+                print(f"  [WARN] カバー画像設定失敗: {e}")
 
-        url = f"https://note.com/{urlname}/n/{note_key}"
-        print(f"  公開完了: {url}")
+        # __IMAGE_n__ プレースホルダーで本文を分割して順番に挿入
+        body_text = body[:50000]
+        parts = re.split(r'(__IMAGE_\d+__)', body_text)
+
+        print(f"  本文入力中（{len(body_text)} 文字）...")
+        editor_el = wait.until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, ".ProseMirror")
+        ))
+        editor_el.click()
+        time.sleep(0.5)
+
+        img_count = 0
+        for part in parts:
+            m2 = re.match(r'__IMAGE_(\d+)__', part.strip())
+            if m2:
+                idx = int(m2.group(1))
+                if idx < len(image_paths) and image_paths[idx]:
+                    img_path = image_paths[idx]
+                    print(f"  [{img_count+1}/{len(image_paths)}] 画像をペースト中: {os.path.basename(img_path)}")
+                    driver.execute_script("document.execCommand('insertText', false, '\\n')")
+                    time.sleep(0.3)
+                    editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
+                    ok = paste_image_from_clipboard(driver, editor_el, img_path)
+                    if ok:
+                        editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
+                        editor_el.send_keys(Keys.RETURN)
+                        time.sleep(0.3)
+                        print(f"    ✓ 画像{img_count+1} 挿入完了")
+                    img_count += 1
+            elif part.strip():
+                insert_section_with_headings(driver, part)
+                time.sleep(0.3)
+
+        time.sleep(2)
+
+        # 下書き保存
+        print("  下書き保存中...")
+        try:
+            draft_btn = wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[contains(., '下書き保存')]")
+            ))
+            draft_btn.click()
+            time.sleep(3)
+            print("  「下書き保存」クリック完了")
+        except Exception:
+            print("  自動保存待ち（5秒）...")
+            time.sleep(5)
+
+        url = f"https://note.com/kawasewatson0106/n/{note_key}"
+        print(f"  下書き保存完了: {url}")
         return url
 
     finally:
@@ -268,7 +335,7 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
-    print(f"\n{'✅ 投稿成功: ' + url if url else '❌ 投稿失敗'}")
+    print(f"\n{'✅ 下書き保存成功: ' + url if url else '❌ 保存失敗'}")
     return result
 
 
