@@ -225,7 +225,7 @@ def interleave_by_source(articles: list[dict]) -> list[dict]:
     return result
 
 
-def select_top_with_gemini(articles: list[dict], top_n: int = 10) -> list[dict]:
+def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summary: str = "") -> list[dict]:
     """Gemini で投資家にとって最も注目度の高い記事を選定"""
     client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -237,9 +237,11 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10) -> list[dict]:
         for i, a in enumerate(articles)
     )
 
+    history_block = f"\n【過去に書いた記事テーマ（これらと重複するテーマは避けること）】\n{history_summary}\n" if history_summary and history_summary != "（過去記事なし）" else ""
+
     prompt = f"""あなたはプロの投資アナリストです。
 以下のニュース一覧から、**本日の投資家にとって深く掘り下げる価値のある記事を{top_n}本**選んでください。
-
+{history_block}
 【選定基準（重要度順）】
 1. **具体性・固有性が高い**：特定企業・特定セクター・特定政策・特定指標に関するニュース
    - 良い例：「NVIDIAが新GPU発表、データセンター向け需要が〜」「FRBのパウエル議長が〜と発言」「日本の春闘で〜%の賃上げ妥結」
@@ -278,7 +280,7 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10) -> list[dict]:
     return articles[:top_n]
 
 
-def collect_and_rank(top_n: int = 10) -> list[dict]:
+def collect_and_rank(top_n: int = 10, history_summary: str = "") -> list[dict]:
     """全ソースからニュースを収集して Gemini で選定"""
     all_articles = []
 
@@ -308,12 +310,17 @@ def collect_and_rank(top_n: int = 10) -> list[dict]:
 
     # Gemini で注目度選定
     print("  Gemini で注目度分析・選定中...")
-    return select_top_with_gemini(unique, top_n=top_n)
+    return select_top_with_gemini(unique, top_n=top_n, history_summary=history_summary)
 
 
 def main():
     print("=== ① ニュース収集 ===")
-    articles = collect_and_rank(top_n=10)
+    from article_history import load_history, build_history_summary
+    history = load_history()
+    history_summary = build_history_summary(history)
+    if history:
+        print(f"  過去記事履歴: {len(history)} 件参照")
+    articles = collect_and_rank(top_n=10, history_summary=history_summary)
 
     os.makedirs("output", exist_ok=True)
     out_path = "output/collected_news.json"

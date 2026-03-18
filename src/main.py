@@ -60,6 +60,20 @@ def run_pipeline():
     except Exception:
         pass
 
+    # 履歴に今回の記事を追加保存
+    try:
+        import json
+        from article_history import add_article
+        print("\n── 記事履歴を更新中...")
+        with open("output/polished.json", encoding="utf-8") as f:
+            polished = json.load(f)
+        with open("output/collected_news.json", encoding="utf-8") as f:
+            news = json.load(f)
+        news_titles = [a.get("title", "") for a in news[:5]]
+        add_article(polished.get("polished", ""), news_titles)
+    except Exception as e:
+        print(f"  [WARN] 履歴保存エラー: {e}")
+
 
 if __name__ == "__main__":
     run_pipeline()

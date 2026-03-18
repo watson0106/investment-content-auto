@@ -14,15 +14,17 @@ from google.genai import types
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 
-def build_research_prompt(articles: list[dict]) -> str:
+def build_research_prompt(articles: list[dict], history_summary: str = "") -> str:
     news_block = "\n".join(
         f"- [{a['source']}] {a['title']}\n  {a['summary'][:200]}\n  URL: {a['url']}"
         for a in articles
     )
+    history_block = f"\n【過去に書いたテーマ（重複禁止）】\n{history_summary}\n" if history_summary and history_summary != "（過去記事なし）" else ""
+
     return f"""あなたはプロの投資ジャーナリスト兼ブロガーです。
 以下のニュース一覧から、本日最も投資家が知るべきニュースを**3本**選んで、
 note.com 向けの投資解説記事を日本語で作成してください。
-
+{history_block}
 【本日のニュース一覧】
 {news_block}
 
@@ -73,11 +75,11 @@ note.com 向けの投資解説記事を日本語で作成してください。
 記事本文のみ出力（前置き・説明不要）。"""
 
 
-def run_deep_research(articles: list[dict]) -> dict:
+def run_deep_research(articles: list[dict], history_summary: str = "") -> dict:
     """Gemini API で記事ドラフトを生成"""
     client = genai.Client(api_key=GEMINI_API_KEY)
 
-    prompt = build_research_prompt(articles)
+    prompt = build_research_prompt(articles, history_summary=history_summary)
 
     print("  Gemini で深掘り分析中...")
     response = client.models.generate_content(
@@ -104,7 +106,9 @@ def main():
     with open("output/collected_news.json", encoding="utf-8") as f:
         articles = json.load(f)
 
-    result = run_deep_research(articles)
+    from article_history import load_history, build_history_summary
+    history_summary = build_history_summary(load_history())
+    result = run_deep_research(articles, history_summary=history_summary)
 
     os.makedirs("output", exist_ok=True)
     out_path = "output/draft.json"
