@@ -207,7 +207,9 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         title_el = wait.until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, 'textarea[placeholder="記事タイトル"]')
         ))
-        title_el.click()
+        driver.execute_script("arguments[0].scrollIntoView(true);", title_el)
+        time.sleep(0.5)
+        driver.execute_script("arguments[0].click();", title_el)
         set_react_textarea(driver, title_el, title)
         time.sleep(1)
 
@@ -260,7 +262,9 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         editor_el = wait.until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, ".ProseMirror")
         ))
-        editor_el.click()
+        driver.execute_script("arguments[0].scrollIntoView(true);", editor_el)
+        time.sleep(0.3)
+        driver.execute_script("arguments[0].click();", editor_el)
         time.sleep(0.5)
 
         img_count = 0
@@ -293,7 +297,9 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
             draft_btn = wait.until(EC.element_to_be_clickable(
                 (By.XPATH, "//button[contains(., '下書き保存')]")
             ))
-            draft_btn.click()
+            driver.execute_script("arguments[0].scrollIntoView(true);", draft_btn)
+            time.sleep(0.3)
+            driver.execute_script("arguments[0].click();", draft_btn)
             time.sleep(3)
             print("  「下書き保存」クリック完了")
         except Exception:
