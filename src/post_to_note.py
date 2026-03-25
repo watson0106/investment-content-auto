@@ -182,8 +182,8 @@ def set_editor_content(driver, element, text: str):
     driver.execute_script("document.execCommand('insertText', false, arguments[0])", text)
 
 
-def post_article(title: str, body: str, image_paths: list[str], tags: list[str], headless: bool = True, cover_path: str | None = None) -> str:
-    """note に記事を下書き保存してURLを返す"""
+def post_article(title: str, body: str, image_paths: list[str], tags: list[str], headless: bool = True, cover_path: str | None = None, price: int = 0) -> str:
+    """note に記事を保存してURLを返す。price>0の場合は有料公開する"""
     driver = build_driver(headless=headless)
     wait   = WebDriverWait(driver, 30)
 
@@ -193,14 +193,98 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         # 新規記事エディタを開く
         print("  エディタを開いています...")
         driver.get("https://note.com/notes/new")
-        time.sleep(10)
 
-        current = driver.current_url
-        print(f"  エディタURL: {current}")
-        m = re.search(r"/notes/([a-zA-Z0-9]+)/edit", current)
-        if not m:
-            raise Exception(f"エディタにリダイレクトされませんでした: {current}")
-        note_key = m.group(1)
+        # 方法1: URLが /notes/XXXX/edit に変わるまで最大30秒待つ
+        note_key = None
+        for i in range(30):
+            time.sleep(1)
+            current = driver.current_url
+            m = re.search(r"/notes/([a-zA-Z0-9]+)/edit", current)
+            if m:
+                note_key = m.group(1)
+                break
+
+        # 方法2: URLが変わらない場合、editor.note.com から API 経由で作成
+        if not note_key:
+            print(f"  URL未遷移 ({driver.current_url})、editor API で note 作成を試みる...")
+            # editor.note.com ドメインにいる状態で API を叩く
+            driver.set_script_timeout(20)
+            create_result = driver.execute_async_script("""
+                var done = arguments[arguments.length - 1];
+                // CSRF トークンを meta から取得
+                var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                fetch('/api/v1/text_notes', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'x-requested-with': 'XMLHttpRequest',
+                        'x-csrf-token': csrfToken
+                    },
+                    body: JSON.stringify({status: 'draft'})
+                })
+                .then(function(r) {
+                    return r.text().then(function(t) { done({status: r.status, text: t}); });
+                })
+                .catch(function(e) { done({error: e.toString()}); });
+            """)
+            if create_result and create_result.get("status") in (200, 201):
+                try:
+                    note_data = json.loads(create_result["text"])
+                    note_key = (note_data.get("data", {}).get("key")
+                                or note_data.get("key"))
+                    if note_key:
+                        print(f"  editor API 作成成功: {note_key}")
+                        driver.get(f"https://editor.note.com/notes/{note_key}/edit/")
+                        time.sleep(5)
+                except Exception as e:
+                    print(f"  [WARN] API レスポンス解析失敗: {e}")
+            else:
+                print(f"  editor API 失敗 (status={create_result.get('status') if create_result else 'None'}, text={str(create_result)[:200]})")
+
+        # 方法3: note.com ドメインから API 経由で作成
+        if not note_key:
+            print("  note.com ドメインで API 作成を試みる...")
+            driver.get("https://note.com/")
+            time.sleep(2)
+            driver.set_script_timeout(20)
+            create_result2 = driver.execute_async_script("""
+                var done = arguments[arguments.length - 1];
+                fetch('/api/v1/text_notes', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'x-requested-with': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({status: 'draft'})
+                })
+                .then(function(r) {
+                    return r.text().then(function(t) { done({status: r.status, text: t}); });
+                })
+                .catch(function(e) { done({error: e.toString()}); });
+            """)
+            if create_result2 and create_result2.get("status") in (200, 201):
+                try:
+                    note_data2 = json.loads(create_result2["text"])
+                    note_key = (note_data2.get("data", {}).get("key")
+                                or note_data2.get("key"))
+                    if note_key:
+                        print(f"  note.com API 作成成功: {note_key}")
+                        driver.get(f"https://editor.note.com/notes/{note_key}/edit/")
+                        time.sleep(5)
+                except Exception as e:
+                    print(f"  [WARN] レスポンス解析失敗: {e}")
+            else:
+                print(f"  note.com API 失敗 (status={create_result2.get('status') if create_result2 else 'None'}, text={str(create_result2)[:300]})")
+
+        if not note_key:
+            raise Exception(f"ノート作成に失敗しました: {driver.current_url}")
+
+        print(f"  エディタURL: {driver.current_url}")
 
         # タイトルを入力
         print(f"  タイトル入力中...")
@@ -275,8 +359,6 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
                 if idx < len(image_paths) and image_paths[idx]:
                     img_path = image_paths[idx]
                     print(f"  [{img_count+1}/{len(image_paths)}] 画像をペースト中: {os.path.basename(img_path)}")
-                    driver.execute_script("document.execCommand('insertText', false, '\\n')")
-                    time.sleep(0.3)
                     editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
                     ok = paste_image_from_clipboard(driver, editor_el, img_path)
                     if ok:
@@ -286,28 +368,66 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
                         print(f"    ✓ 画像{img_count+1} 挿入完了")
                     img_count += 1
             elif part.strip():
-                insert_section_with_headings(driver, part)
+                insert_section_with_headings(driver, part.strip())
                 time.sleep(0.3)
 
         time.sleep(2)
 
-        # 下書き保存
-        print("  下書き保存中...")
-        try:
-            draft_btn = wait.until(EC.element_to_be_clickable(
-                (By.XPATH, "//button[contains(., '下書き保存')]")
-            ))
-            driver.execute_script("arguments[0].scrollIntoView(true);", draft_btn)
-            time.sleep(0.3)
-            driver.execute_script("arguments[0].click();", draft_btn)
-            time.sleep(3)
-            print("  「下書き保存」クリック完了")
-        except Exception:
-            print("  自動保存待ち（5秒）...")
-            time.sleep(5)
+        if price > 0:
+            # 有料公開: note API で price を設定して公開
+            print(f"  有料記事として公開中（¥{price}）...")
+            driver.set_script_timeout(20)
+            pub_result = driver.execute_async_script(f"""
+                var done = arguments[arguments.length - 1];
+                fetch('/api/v1/text_notes/{note_key}', {{
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: {{
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'x-requested-with': 'XMLHttpRequest'
+                    }},
+                    body: JSON.stringify({{
+                        status: 'public',
+                        price: {price},
+                        hashtag_list: {json.dumps(tags)}
+                    }})
+                }})
+                .then(function(r) {{
+                    return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
+                }})
+                .catch(function(e) {{ done({{error: e.toString()}}); }});
+            """)
+            if pub_result and pub_result.get("status") in (200, 201):
+                print(f"  有料公開成功 (¥{price})")
+            else:
+                print(f"  [WARN] 有料公開API失敗 (status={pub_result.get('status') if pub_result else 'None'})。下書き保存にフォールバック")
+                try:
+                    draft_btn = wait.until(EC.element_to_be_clickable(
+                        (By.XPATH, "//button[contains(., '下書き保存')]")
+                    ))
+                    driver.execute_script("arguments[0].click();", draft_btn)
+                    time.sleep(3)
+                except Exception:
+                    time.sleep(5)
+        else:
+            # 無料記事: 下書き保存
+            print("  下書き保存中...")
+            try:
+                draft_btn = wait.until(EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(., '下書き保存')]")
+                ))
+                driver.execute_script("arguments[0].scrollIntoView(true);", draft_btn)
+                time.sleep(0.3)
+                driver.execute_script("arguments[0].click();", draft_btn)
+                time.sleep(3)
+                print("  「下書き保存」クリック完了")
+            except Exception:
+                print("  自動保存待ち（5秒）...")
+                time.sleep(5)
 
         url = f"https://note.com/kawasewatson0106/n/{note_key}"
-        print(f"  下書き保存完了: {url}")
+        print(f"  {'公開' if price > 0 else '下書き保存'}完了: {url}")
         return url
 
     finally:

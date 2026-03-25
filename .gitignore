@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+venv/
+.venv/
+
+# 出力（毎回上書きされる一時ファイル）
+output/
+src/output/
+
+# ローカルのみ
+*.DS_Store
+
+# data/ は git 管理する（strategy_state.json, article_performance.json 等）
+# 以下は除外しない
+# data/

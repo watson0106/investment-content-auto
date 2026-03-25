@@ -41,15 +41,14 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1280x900x24 &
           sleep 2
-          cd src
-          python main.py
+          python src/main.py
 
-      - name: 記事履歴をリポジトリにコミット
+      - name: 記事履歴・データをリポジトリにコミット
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add history/article_history.json || true
-          git diff --staged --quiet || git commit -m "記事履歴を更新 [skip ci]"
+          git add history/article_history.json data/article_performance.json data/strategy_state.json data/magazine_status.json || true
+          git diff --staged --quiet || git commit -m "データ更新 [skip ci]"
           git push || true
 
       - name: 生成記事をアーティファクトとして保存

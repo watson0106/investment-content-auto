@@ -34,8 +34,10 @@ RSS_SOURCES = [
     {"name": "Nikkei Asia",          "url": "https://asia.nikkei.com/rss/feed/nar"},
     {"name": "Yahoo Finance",        "url": "https://finance.yahoo.com/news/rssindex"},
     {"name": "Yahoo Finance Japan",  "url": "https://news.yahoo.co.jp/rss/topics/business.xml"},
+    {"name": "Yahoo Japan トップ",   "url": "https://news.yahoo.co.jp/rss/topics/top-picks.xml"},
     {"name": "CNBC",                 "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"},
     {"name": "MarketWatch",          "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories"},
+    {"name": "NHK 経済",             "url": "https://www.nhk.or.jp/rss/news/cat6.xml"},
 ]
 
 
@@ -145,6 +147,71 @@ def fetch_nikkei_web(max_articles: int = 15) -> list[dict]:
         print(f"  [WARN] 日経: {e}")
 
     print(f"  日経: {len(articles)} 件取得")
+    return articles
+
+
+def fetch_google_trends_jp(max_trends: int = 20) -> list[dict]:
+    """
+    Google トレンド（日本）からバズっているキーワードと関連ニュースを取得する。
+    ログイン不要・公式RSS。URL: https://trends.google.com/trending/rss?geo=JP
+
+    各トレンドに紐づく ht:news_item（関連記事）を展開して返す。
+    Gemini による選定で投資関連トピックのみ最終的に採用される。
+    """
+    import xml.etree.ElementTree as ET
+
+    url = "https://trends.google.com/trending/rss?geo=JP"
+    NS = "https://trends.google.com/trending/rss"
+    articles = []
+
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+
+        root = ET.fromstring(resp.text)
+        channel = root.find("channel")
+        if channel is None:
+            return articles
+
+        for item in list(channel.findall("item"))[:max_trends]:
+            keyword = (item.findtext("title") or "").strip()
+            traffic = (item.findtext(f"{{{NS}}}approx_traffic") or "").strip()
+
+            # ht:news_item の関連記事を展開
+            news_items = item.findall(f"{{{NS}}}news_item")
+            added = 0
+            for ni in news_items:
+                title   = (ni.findtext(f"{{{NS}}}news_item_title") or "").strip()
+                ni_url  = (ni.findtext(f"{{{NS}}}news_item_url") or "").strip()
+                snippet = (ni.findtext(f"{{{NS}}}news_item_snippet") or "").strip()
+                if not title:
+                    continue
+                summary = f"Googleトレンド「{keyword}」({traffic}検索)"
+                if snippet:
+                    summary += f" — {snippet}"
+                articles.append({
+                    "source":    "Google Trends JP",
+                    "title":     title,
+                    "summary":   summary[:300],
+                    "url":       ni_url,
+                    "published": "",
+                })
+                added += 1
+
+            # 関連記事がない場合はキーワード自体を1件として追加
+            if added == 0 and keyword:
+                articles.append({
+                    "source":    "Google Trends JP",
+                    "title":     keyword,
+                    "summary":   f"Googleトレンド急上昇（{traffic}検索）",
+                    "url":       url,
+                    "published": "",
+                })
+
+    except Exception as e:
+        print(f"  [WARN] Google Trends JP: {e}")
+
+    print(f"  Google Trends JP: {len(articles)} 件取得")
     return articles
 
 
@@ -297,6 +364,10 @@ def collect_and_rank(top_n: int = 10, history_summary: str = "") -> list[dict]:
     # 日経（スクレイピング）
     print("  取得中: 日経新聞")
     all_articles.extend(fetch_nikkei_web())
+
+    # Google トレンド JP（ログイン不要・公式RSS）
+    print("  取得中: Google Trends JP")
+    all_articles.extend(fetch_google_trends_jp())
 
     # note トレンド（API）
     print("  取得中: note トレンド")

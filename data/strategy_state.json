@@ -1,0 +1,48 @@
+{
+  "last_updated": "2026-03-25",
+  "analysis_period_days": 365,
+  "articles_analyzed": 93,
+  "avg_likes_overall": 4.0,
+  "top_topics": [
+    {
+      "topic": "金",
+      "avg_likes": 0.5,
+      "count": 2
+    }
+  ],
+  "top_title_patterns": [
+    {
+      "pattern": "疑問形+数字",
+      "avg_likes": 4.7,
+      "count": 23
+    },
+    {
+      "pattern": "数字あり",
+      "avg_likes": 4.3,
+      "count": 21
+    },
+    {
+      "pattern": "その他",
+      "avg_likes": 3.9,
+      "count": 15
+    }
+  ],
+  "best_posting_days": [
+    "日",
+    "土"
+  ],
+  "avg_likes_by_weekday": {
+    "水": 2.9,
+    "火": 3.9,
+    "月": 3.2,
+    "日": 5.8,
+    "木": 2.6,
+    "金": 3.7,
+    "土": 5.4
+  },
+  "recommended_topics": [
+    "金"
+  ],
+  "recommended_title_style": "疑問形+数字（例：「2026年のNISAはまだS&P 500だけで大丈」）",
+  "avoid_topics": []
+}
