@@ -329,7 +329,7 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summar
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-pro",
             contents=prompt,
             config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=256),
         )
