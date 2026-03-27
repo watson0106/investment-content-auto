@@ -118,30 +118,21 @@ def run_pipeline():
 
     # ── 毎日実行ステップ ──────────────────────────────────────────
 
-    steps = [
-        ("① ニュース収集",              collect_news.main),
-        ("② Gemini 記事執筆",           deep_research.main),
-        ("③ Claude 添削",               fact_check.main),
-        ("④ タイトル生成",              generate_title.main),
-        ("⑤ note 投稿（無料）",          post_to_note.main),
+    # ── ①〜④ 記事生成ステップ ──────────────────────────────────────
+
+    gen_steps = [
+        ("① ニュース収集",    collect_news.main),
+        ("② Gemini 記事執筆", deep_research.main),
+        ("③ Claude 添削",     fact_check.main),
+        ("④ タイトル生成",    generate_title.main),
     ]
 
-    posted_note_key = None
-    posted_url = None
-
-    for name, func in steps:
+    for name, func in gen_steps:
         print(f"\n{'─'*40}")
         print(f"  {name}")
         print(f"{'─'*40}")
         try:
-            result = func()
-            # ⑥の結果からnote_keyとURLを取得
-            if name.startswith("⑥") and isinstance(result, dict):
-                posted_url = result.get("url", "")
-                import re
-                m = re.search(r"/n/([a-zA-Z0-9]+)$", posted_url)
-                if m:
-                    posted_note_key = m.group(1)
+            func()
         except Exception:
             print(f"\n[ERROR] {name} でエラー発生:")
             traceback.print_exc()
@@ -149,22 +140,12 @@ def run_pipeline():
                 print("  重要ステップ失敗のため終了")
                 sys.exit(1)
 
-    # ── ⑦ 投稿結果の検証 ──────────────────────────────────────────
-
-    print(f"\n{'─'*40}")
-    print("  ⑦ 投稿結果の検証")
-    print(f"{'─'*40}")
-    try:
-        verify_posted_article(posted_url, posted_note_key)
-    except Exception:
-        print("  [WARN] 検証エラー（継続）:")
-        traceback.print_exc()
-
-    # ── ⑧ 有料記事生成・投稿 ─────────────────────────────────────
+    # ── ⑤ 有料記事生成・投稿（先に投稿してURLを取得） ──────────────
 
     paid_url = None
+    paid_article_text = ""
     print(f"\n{'─'*40}")
-    print("  ⑧ 有料記事生成・投稿（100円）")
+    print("  ⑤ 有料記事生成・投稿（100円）")
     print(f"{'─'*40}")
     try:
         with open("output/polished.json", encoding="utf-8") as f:
@@ -176,17 +157,17 @@ def run_pipeline():
         free_title_text = final_data.get("title", "")
 
         paid_result = generate_paid_article.generate_paid_article(free_article_text, free_title_text)
+        paid_article_text = paid_result.get("article", "")
 
         with open("output/paid_draft.json", "w", encoding="utf-8") as f:
             json.dump(paid_result, f, ensure_ascii=False, indent=2)
 
-        # noteに有料記事として投稿（画像なし、100円）
         print("  noteに有料記事を投稿中...")
         headless = os.environ.get("HEADLESS", "true").lower() == "true"
         paid_tags = ["投資", "有料記事", "投資戦略", "ポートフォリオ"]
         paid_url = post_to_note.post_article(
             title=paid_result["title"],
-            body=paid_result["article"],
+            body=paid_article_text,
             image_paths=[],
             tags=paid_tags,
             headless=headless,
@@ -201,20 +182,58 @@ def run_pipeline():
         print("  [WARN] 有料記事生成・投稿エラー（継続）:")
         traceback.print_exc()
 
-    # ── ⑨ 無料記事に有料記事リンクを追記 ───────────────────────────
+    # ── ⑥ 無料記事投稿（有料記事への導線を含めて投稿） ────────────
 
-    if paid_url and posted_note_key:
-        print(f"\n{'─'*40}")
-        print("  ⑨ 無料記事に有料記事リンクを追記")
-        print(f"{'─'*40}")
-        try:
-            cta_text = generate_paid_article.build_free_article_cta(paid_url)
-            headless = os.environ.get("HEADLESS", "true").lower() == "true"
-            post_to_note.update_article_body(posted_note_key, cta_text, headless=headless)
-            print("  リンク追記完了")
-        except Exception:
-            print("  [WARN] リンク追記エラー（継続）:")
-            traceback.print_exc()
+    posted_note_key = None
+    posted_url = None
+    print(f"\n{'─'*40}")
+    print("  ⑥ note 投稿（無料記事 + 有料記事への導線）")
+    print(f"{'─'*40}")
+    try:
+        with open("output/final.json", encoding="utf-8") as f:
+            final_data = json.load(f)
+
+        free_body = final_data.get("article", "")
+
+        # 有料記事URLがあれば導線テキストを末尾に追加してから投稿
+        if paid_url:
+            cta = generate_paid_article.build_free_article_cta(paid_url, paid_article_text)
+            free_body = free_body.rstrip() + cta
+            print("  有料記事への導線を本文末尾に追加")
+
+        headless = os.environ.get("HEADLESS", "true").lower() == "true"
+        result = post_to_note.post_article(
+            title=final_data["title"],
+            body=free_body,
+            image_paths=[],
+            tags=post_to_note.NOTE_TAGS,
+            headless=headless,
+            cover_path=None,
+        )
+        if result:
+            posted_url = result
+            import re
+            m = re.search(r"/n/([a-zA-Z0-9]+)$", posted_url)
+            if m:
+                posted_note_key = m.group(1)
+            print(f"  無料記事投稿完了: {posted_url}")
+
+            with open("output/posted.json", "w", encoding="utf-8") as f:
+                json.dump({"url": posted_url, "title": final_data["title"], "status": "success"}, f, ensure_ascii=False, indent=2)
+    except Exception:
+        print(f"\n[ERROR] 無料記事投稿エラー:")
+        traceback.print_exc()
+
+    # ── ⑦ 投稿結果の検証 ──────────────────────────────────────────
+
+    print(f"\n{'─'*40}")
+    print("  ⑦ 投稿結果の検証")
+    print(f"{'─'*40}")
+    try:
+        verify_posted_article(posted_url, posted_note_key)
+    except Exception:
+        print("  [WARN] 検証エラー（継続）:")
+        traceback.print_exc()
 
     # ── ⑩ PDCAトラッカー（スキ数更新 + 記事登録） ─────────────────
 

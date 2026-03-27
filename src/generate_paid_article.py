@@ -132,16 +132,34 @@ def generate_paid_title(free_title: str, article_summary: str) -> str:
     return f"{free_title}｜私の具体的な投資判断を公開"
 
 
-def build_free_article_cta(paid_url: str) -> str:
-    """無料記事末尾に追加する有料記事への導線テキスト"""
+def build_free_article_cta(paid_url: str, paid_article: str = "") -> str:
+    """無料記事末尾に追加する有料記事への導線テキスト。有料記事の冒頭を引用して「続きが気になる」形にする"""
+
+    # 有料記事の結論部分（冒頭200文字）を抽出してチラ見せ
+    teaser = ""
+    if paid_article:
+        # ## 結論 セクションの中身を取得
+        import re
+        m = re.search(r"## 結論[^\n]*\n+(.*?)(?=\n---|\n##)", paid_article, re.DOTALL)
+        if m:
+            teaser_full = m.group(1).strip()
+            # 最初の2文だけ抽出
+            sentences = re.split(r"(?<=[。！？])", teaser_full)
+            teaser = "".join(sentences[:2]).strip()
+            if len(teaser) > 200:
+                teaser = teaser[:200] + "..."
+        if not teaser:
+            teaser = paid_article[:200].strip() + "..."
+
+    teaser_block = f"\n\n> {teaser}\n" if teaser else ""
+
     return f"""
 
 ---
 
-## 最後に
-
-本記事では「何が起きているか」を解説しましたが、「じゃあ具体的にどう動くか」は別記事にまとめています。
-トリガー価格、セクター別の勝ち負け、私が実際に動かすポジションまで踏み込んでいます。
+## ここまでの解説を踏まえて、私が実際にどう動くか
+{teaser_block}
+この続き――具体的にどのポジションを動かすか、どの価格で何をトリガーにするか、市場が見落としている本当の受益者は誰か――は以下の記事にまとめています。
 
 {paid_url}
 """
