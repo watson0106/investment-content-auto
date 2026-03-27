@@ -52,7 +52,7 @@ def build_driver(headless: bool = True):
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1280,900")
-        return uc.Chrome(options=options, headless=headless)
+        return uc.Chrome(options=options, headless=headless, version_main=146)
 
 
 def login(driver, wait: WebDriverWait):
@@ -365,7 +365,7 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
                         editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
                         editor_el.send_keys(Keys.RETURN)
                         time.sleep(0.3)
-                        print(f"    ✓ 画像{img_count+1} 挿入完了")
+                        print(f"    [OK] 画像{img_count+1} 挿入完了")
                     img_count += 1
             elif part.strip():
                 insert_section_with_headings(driver, part.strip())
@@ -434,6 +434,81 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         driver.quit()
 
 
+def update_article_body(note_key: str, append_text: str, headless: bool = True) -> bool:
+    """既存記事の本文末尾にテキストを追記する。
+
+    note API で記事を取得し、本文末尾に append_text を追加して PUT する。
+    """
+    driver = build_driver(headless=headless)
+    wait = WebDriverWait(driver, 30)
+
+    try:
+        login(driver, wait)
+
+        # エディタページに遷移してAPIを叩く
+        driver.get(f"https://editor.note.com/notes/{note_key}/edit/")
+        time.sleep(5)
+
+        # 現在の記事データを取得
+        driver.set_script_timeout(20)
+        get_result = driver.execute_async_script(f"""
+            var done = arguments[arguments.length - 1];
+            fetch('/api/v1/text_notes/{note_key}', {{
+                method: 'GET',
+                credentials: 'include',
+                headers: {{
+                    'Accept': 'application/json',
+                    'x-requested-with': 'XMLHttpRequest'
+                }}
+            }})
+            .then(function(r) {{
+                return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
+            }})
+            .catch(function(e) {{ done({{error: e.toString()}}); }});
+        """)
+
+        if not get_result or get_result.get("status") not in (200, 201):
+            print(f"  [WARN] 記事取得失敗 (status={get_result.get('status') if get_result else 'None'})")
+            return False
+
+        note_data = json.loads(get_result["text"])
+        current_body = (note_data.get("data", {}).get("body")
+                        or note_data.get("body", ""))
+
+        # 末尾に追記
+        new_body = current_body.rstrip() + "\n\n" + append_text
+
+        # 記事を更新
+        update_payload = json.dumps({"body": new_body}, ensure_ascii=False)
+        update_result = driver.execute_async_script(f"""
+            var done = arguments[arguments.length - 1];
+            fetch('/api/v1/text_notes/{note_key}', {{
+                method: 'PUT',
+                credentials: 'include',
+                headers: {{
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'x-requested-with': 'XMLHttpRequest'
+                }},
+                body: arguments[0]
+            }})
+            .then(function(r) {{
+                return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
+            }})
+            .catch(function(e) {{ done({{error: e.toString()}}); }});
+        """, update_payload)
+
+        if update_result and update_result.get("status") in (200, 201):
+            print(f"  記事更新成功: {note_key}")
+            return True
+        else:
+            print(f"  [WARN] 記事更新失敗 (status={update_result.get('status') if update_result else 'None'})")
+            return False
+
+    finally:
+        driver.quit()
+
+
 def main():
     print("=== ⑥ note.com 自動投稿 ===")
 
@@ -463,7 +538,7 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
-    print(f"\n{'✅ 下書き保存成功: ' + url if url else '❌ 保存失敗'}")
+    print(f"\n{'下書き保存成功: ' + url if url else '保存失敗'}")
     return result
 
 

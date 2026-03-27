@@ -52,15 +52,16 @@ def generate_titles(article_text: str) -> list[str]:
 タイトル候補のみを出力してください。"""
 
     # Claude CLI が使えるか確認
-    claude_available = subprocess.run(["which", "claude"], capture_output=True).returncode == 0
+    import shutil
+    claude_path = shutil.which("claude")
 
     text = ""
-    if claude_available:
+    if claude_path:
         print("  Claude CLI でタイトル生成中...")
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         result = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "text"],
-            capture_output=True, text=True, timeout=60, env=env
+            [claude_path, "-p", prompt, "--output-format", "text"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, env=env
         )
         text = result.stdout.strip() if result.returncode == 0 else ""
 

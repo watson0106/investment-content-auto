@@ -145,7 +145,7 @@ def auto_add_high_like_articles(driver, magazine_id: str, status: dict) -> int:
         if add_note_to_magazine(driver, magazine_id, note_key):
             added_keys.add(note_key)
             added_count += 1
-            print(f"  ✓ マガジン追加: {title} ({likes}スキ)")
+            print(f"  [OK] マガジン追加: {title} ({likes}スキ)")
             time.sleep(0.5)
 
     status["added_note_keys"] = list(added_keys)

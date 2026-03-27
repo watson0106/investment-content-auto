@@ -1,14 +1,14 @@
 """
 パイプライン全体を順番に実行するエントリポイント
 
-毎日（07:00 JST）:
+毎日（04:00 JST）:
   ① ニュース収集 → ② 記事執筆（個人視点・一人称） → ③ クリーンアップ
   → ④ 画像生成 → ⑤ タイトル生成（動的・PDCA反映）
-  → ⑥ note 投稿（無料） → ⑦ YouTube note 下書き
+  → ⑥ note 投稿（無料）
+  → ⑨ 有料記事生成・投稿（推奨銘柄があれば毎日）
+  → 無料記事に有料記事リンクを追記
+  → ⑦ YouTube note 下書き
   → ⑧ PDCAトラッカー（スキ数更新）
-
-火・金のみ追加:
-  → ⑨ 有料記事生成・投稿（¥500）
 
 月曜のみ追加:
   → ⑩ 週次PDCA分析（strategy_state.json 更新）
@@ -47,11 +47,6 @@ import anomaly_detector
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
 
-def is_paid_article_day() -> bool:
-    """火曜(1)または金曜(4)"""
-    return datetime.datetime.now(JST).weekday() in (1, 4)
-
-
 def is_weekly_analysis_day() -> bool:
     """月曜(0)"""
     return datetime.datetime.now(JST).weekday() == 0
@@ -73,10 +68,11 @@ def run_pipeline():
         ("④ 画像生成",                  generate_images.main),
         ("⑤ タイトル生成（動的）",       generate_title.main),
         ("⑥ note 投稿（無料）",          post_to_note.main),
-        ("⑦ YouTube note 下書き",       youtube_note_pipeline.main),
     ]
 
     posted_note_key = None
+    free_article_url = None
+    recommended_stocks: list[str] = []
 
     for name, func in steps:
         print(f"\n{'─'*40}")
@@ -84,20 +80,85 @@ def run_pipeline():
         print(f"{'─'*40}")
         try:
             result = func()
+            if name.startswith("②") and isinstance(result, dict):
+                recommended_stocks = result.get("recommended_stocks", [])
+
             # ⑥の結果からnote_keyを取得
             if name.startswith("⑥") and isinstance(result, dict):
-                url = result.get("url", "")
+                free_article_url = result.get("url", "")
                 import re
-                m = re.search(r"/n/([a-zA-Z0-9]+)$", url)
+                m = re.search(r"/n/([a-zA-Z0-9]+)$", free_article_url)
                 if m:
                     posted_note_key = m.group(1)
         except Exception:
-            print(f"\n❌ {name} でエラー発生:")
+            print(f"\n[ERROR] {name} でエラー発生:")
             traceback.print_exc()
             if name.startswith("①") or name.startswith("②"):
                 print("  重要ステップ失敗のため終了")
                 sys.exit(1)
             # 非重要ステップは継続
+
+    # ── draft.json から推奨銘柄を読み取り（②の返り値がなかった場合のフォールバック）──
+    if not recommended_stocks:
+        try:
+            with open("output/draft.json", encoding="utf-8") as f:
+                draft_data = json.load(f)
+            recommended_stocks = draft_data.get("recommended_stocks", [])
+        except Exception:
+            pass
+
+    # ── ⑨ 有料記事生成・投稿（推奨銘柄があれば毎日） ─────────────────
+
+    paid_articles: list[dict] = []
+
+    if recommended_stocks:
+        print(f"\n{'─'*40}")
+        print(f"  ⑨ 有料記事生成・投稿（推奨銘柄: {', '.join(recommended_stocks[:1])}）")
+        print(f"{'─'*40}")
+        for stock in recommended_stocks[:1]:  # 1番目の銘柄で1記事のみ
+            try:
+                paid_result = generate_paid_article.create_paid_article_for_stock(stock)
+                if paid_result and paid_result.get("url"):
+                    paid_articles.append(paid_result)
+            except Exception:
+                print(f"  [WARN] 有料記事生成失敗：{stock}")
+                traceback.print_exc()
+    else:
+        print(f"\n{'─'*40}")
+        print("  ⑨ 有料記事生成 → スキップ（推奨銘柄なし）")
+        print(f"{'─'*40}")
+
+    # ── 無料記事に有料記事リンクを追記 ──────────────────────────────
+
+    if paid_articles and posted_note_key:
+        print(f"\n{'─'*40}")
+        print("  無料記事に有料記事リンクを追記")
+        print(f"{'─'*40}")
+        try:
+            link_lines = []
+            for pa in paid_articles:
+                stock_name = pa.get("target_stock", "銘柄")
+                paid_url = pa.get("url", "")
+                link_lines.append(
+                    f"▶ {stock_name}の詳細IR分析はこちら\n{paid_url}"
+                )
+            append_text = "\n\n---\n\n" + "\n\n".join(link_lines)
+            headless = os.environ.get("HEADLESS", "true").lower() == "true"
+            post_to_note.update_article_body(posted_note_key, append_text, headless=headless)
+        except Exception:
+            print("  [WARN] 無料記事へのリンク追記失敗（継続）:")
+            traceback.print_exc()
+
+    # ── ⑦ YouTube note 下書き ────────────────────────────────────
+
+    print(f"\n{'─'*40}")
+    print("  ⑦ YouTube note 下書き")
+    print(f"{'─'*40}")
+    try:
+        youtube_note_pipeline.main()
+    except Exception:
+        print("  [WARN] YouTube note 下書きエラー（継続）:")
+        traceback.print_exc()
 
     # ── ⑧ PDCAトラッカー（スキ数更新 + 記事登録） ─────────────────
 
@@ -129,18 +190,6 @@ def run_pipeline():
     except Exception:
         print("  [WARN] PDCAトラッカーエラー（継続）:")
         traceback.print_exc()
-
-    # ── ⑨ 有料記事生成（火・金のみ） ────────────────────────────
-
-    if is_paid_article_day():
-        print(f"\n{'─'*40}")
-        print("  ⑨ 有料記事生成・投稿（¥500）")
-        print(f"{'─'*40}")
-        try:
-            generate_paid_article.main()
-        except Exception:
-            print("  [WARN] 有料記事生成エラー（継続）:")
-            traceback.print_exc()
 
     # ── ⑩ 週次PDCA分析（月曜のみ） ──────────────────────────────
 
@@ -192,7 +241,7 @@ def run_pipeline():
     # ── 完了 ─────────────────────────────────────────────────────
 
     print("\n" + "=" * 50)
-    print("✅ パイプライン完了")
+    print("パイプライン完了")
     print("=" * 50)
 
     try:

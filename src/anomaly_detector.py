@@ -127,10 +127,10 @@ def run_checks() -> dict:
     for result in checks:
         if result:
             alerts.append(result)
-            print(f"  🚨 異常検知: {result}")
+            print(f"  [ALERT] 異常検知: {result}")
 
     if not alerts:
-        print("  ✅ 異常なし")
+        print("  異常なし")
 
     return {"alerts": alerts, "checked_at": datetime.datetime.now(JST).isoformat()}
 
@@ -139,7 +139,7 @@ def main() -> None:
     print("=== 異常検知 ===")
     result = run_checks()
     if result["alerts"]:
-        print(f"\n⚠️ {len(result['alerts'])}件のアラートが検出されました")
+        print(f"\n[WARN] {len(result['alerts'])}件のアラートが検出されました")
     return result
 
 

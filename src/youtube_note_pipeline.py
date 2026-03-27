@@ -198,12 +198,13 @@ def generate_youtube_article(topic: dict) -> str:
 
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
-    claude_available = subprocess.run(["which", "claude"], capture_output=True).returncode == 0
-    if claude_available:
+    import shutil
+    claude_path = shutil.which("claude")
+    if claude_path:
         print("  Claude CLI で深掘りリサーチ中（6000字以上）...")
         result = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
-            capture_output=True, text=True, timeout=600, env=env,
+            [claude_path, "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, env=env,
         )
         if result.returncode == 0 and result.stdout.strip():
             article = result.stdout.strip()

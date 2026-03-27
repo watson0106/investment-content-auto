@@ -75,9 +75,9 @@ def _build_report(posted_url: str = "", anomaly_result: dict = None) -> str:
 
     # 投稿URL
     if posted_url:
-        lines.append(f"✅ 本日の記事: {posted_url}")
+        lines.append(f"本日の記事: {posted_url}")
     else:
-        lines.append("⚠️ 本日の記事: 投稿URLなし")
+        lines.append("[WARN] 本日の記事: 投稿URLなし")
 
     # パフォーマンスサマリー
     perf = _load_json(PERFORMANCE_PATH)
@@ -100,7 +100,7 @@ def _build_report(posted_url: str = "", anomaly_result: dict = None) -> str:
         )
 
         lines.append("")
-        lines.append(f"📊 パフォーマンス")
+        lines.append(f"[パフォーマンス]")
         lines.append(f"  総記事数: {total_articles}本  総スキ: {total_likes}")
         lines.append(f"  全期間平均: {avg_likes:.1f}スキ  最高: {max_likes}スキ")
         lines.append(f"  直近7日平均: {recent_avg:.1f}スキ（{len(recent)}本）")
@@ -109,7 +109,7 @@ def _build_report(posted_url: str = "", anomaly_result: dict = None) -> str:
         top3 = sorted(perf, key=lambda x: x.get("latest_likes", 0), reverse=True)[:3]
         if top3:
             lines.append("")
-            lines.append("🏆 スキTOP3")
+            lines.append("スキTOP3")
             for i, p in enumerate(top3, 1):
                 title = p.get("title", "")[:25]
                 likes = p.get("latest_likes", 0)
@@ -122,19 +122,19 @@ def _build_report(posted_url: str = "", anomaly_result: dict = None) -> str:
         rec_style = state.get("recommended_title_style", "")
         if best_days:
             lines.append("")
-            lines.append(f"💡 推奨: 投稿は{'/'.join(best_days[:2])}曜日、{rec_style}")
+            lines.append(f"推奨: 投稿は{'/'.join(best_days[:2])}曜日、{rec_style}")
 
     # 異常検知結果
     if anomaly_result:
         alerts = anomaly_result.get("alerts", [])
         if alerts:
             lines.append("")
-            lines.append(f"🚨 アラート ({len(alerts)}件)")
+            lines.append(f"[ALERT] ({len(alerts)}件)")
             for alert in alerts[:5]:
                 lines.append(f"  ・{alert}")
         else:
             lines.append("")
-            lines.append("✅ 異常なし")
+            lines.append("異常なし")
 
     return "\n".join(lines)
 
@@ -160,10 +160,10 @@ def send_daily_report(posted_url: str = "", anomaly_result: dict = None) -> None
 
     sent = False
     if _send_line(message):
-        print("  ✅ LINE Notify 送信完了")
+        print("  LINE Notify 送信完了")
         sent = True
     if _send_slack(message):
-        print("  ✅ Slack Webhook 送信完了")
+        print("  Slack Webhook 送信完了")
         sent = True
     if not sent:
         print("  [INFO] 通知先未設定（LINE_NOTIFY_TOKEN / SLACK_WEBHOOK_URL）")
