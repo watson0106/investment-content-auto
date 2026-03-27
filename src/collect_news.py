@@ -400,7 +400,8 @@ def main():
 
     print(f"\n選出記事 ({len(articles)} 件):")
     for i, a in enumerate(articles, 1):
-        print(f"  {i}. [{a['source']}] {a['title'][:65]}")
+        title_clean = a['title'].replace('\xa0', ' ')[:65]
+        print(f"  {i}. [{a['source']}] {title_clean}")
 
     print(f"\n保存: {out_path}")
     return articles
