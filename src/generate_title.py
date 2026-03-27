@@ -79,16 +79,30 @@ def generate_titles(article_text: str) -> list[str]:
         text = response.text.strip()
     lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
 
-    # 番号付きリストをパース
+    # 番号付きリスト or テーブル形式をパース
+    import re
     titles = []
     for line in lines:
+        title = None
         # "1. タイトル" 形式
-        import re
         m = re.match(r"^\d+[\.\)]\s*(.+)$", line)
         if m:
-            titles.append(m.group(1).strip())
-        elif line and not line.startswith("#"):
-            titles.append(line)
+            title = m.group(1).strip()
+        # "| 1 | タイトル | 説明 |" テーブル形式
+        elif "|" in line:
+            cells = [c.strip() for c in line.split("|") if c.strip()]
+            if len(cells) >= 2 and re.match(r"^\d+$", cells[0]):
+                title = cells[1]  # 2番目のセルがタイトル
+            elif len(cells) >= 2 and re.match(r"^-+$", cells[0]):
+                continue  # テーブルヘッダー区切り行をスキップ
+        # ヘッダー行・説明行・区切り線はスキップ
+        if title:
+            # Markdown太字(**...**)を除去
+            title = re.sub(r"\*\*(.+?)\*\*", r"\1", title)
+            # 先頭の【】日付タグはそのまま残す
+            title = title.strip()
+            if title and len(title) >= 5 and not title.startswith("#") and not re.match(r"^[-=|]+$", title):
+                titles.append(title)
 
     print(f"  {len(titles)} 案のタイトルを生成")
     return titles[:10]

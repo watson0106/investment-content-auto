@@ -6,41 +6,51 @@
 ## プロジェクト概要
 - 毎日投資ニュースを自動収集・AI分析・記事生成・note投稿するパイプライン
 - GitHub Actions で毎朝 JST 07:00 に自動実行
+- **記事は1日1記事のみ**（有料記事・YouTube下書き等の2つ目は作らない）
 
 ## ユーザー指示
 - おおまかな計画だけ言う、細かい判断・選択はすべてClaudeに一任
 - 承認を求めずに最善策を実行して成果物を作り上げること
 - 会話の進捗・決定事項を CLAUDE.md に逐一保存すること
+- **修正・変更したら必ず自分で実行して検証すること**（動作確認せずに「修正しました」で終わらない）
 
-## 進捗状況
+## パイプラインフロー（無料記事 + 有料記事のセット）
+1. ① ニュース収集（RSS 13ソース → スコアリング → 上位10件選出）
+2. ② Gemini で深掘り記事執筆（Claude CLIは会話応答を返すためGeminiをメインで使用）
+3. ③ Claude Opus で添削（ファクトチェック・個人ブロガー口調に調整）
+4. ④ Gemini 3 Pro で画像生成（カバー画像 + 本文中のイメージ画像）
+5. ⑤ タイトル生成（Claude CLI → スコアリング自動選択）
+6. ⑥ note に無料記事を下書き保存
+7. ⑦ 投稿結果の検証（タイトル・本文・画像の品質チェック）
+8. ⑧ 有料記事生成・投稿（100円、画像なし、GS級分析＋ブロガー口調）
+9. ⑨ 無料記事の末尾に有料記事リンクを追記
+10. ⑩ PDCAトラッカー（スキ数更新）
 
-### PHASE 1：コード実装 ✅ 完了
-- [x] src/collect_news.py（RSS 13ソース、スコアリング・重複除去）
-- [x] src/deep_research.py（Gemini 2.0 Flash で記事ドラフト生成）
-- [x] src/fact_check.py（Claude Opus でファクトチェック・文体調整）
-- [x] src/generate_images.py（Gemini 画像生成 API で図表挿入）
-- [x] src/generate_title.py（Claude Opus でタイトル10案生成・自動選択）
-- [x] src/post_to_note.py（Selenium で note.com に自動投稿）
-- [x] src/main.py（パイプライン統合エントリポイント）
-- [x] .github/workflows/daily_post.yml（毎日 JST 07:00 自動実行）
+## 有料記事の仕様
+- 無料記事のテーマに紐づく「具体的な投資アクションプラン」
+- ペルソナ: GS出身シニアアナリスト級の分析力、ブロガー口調で執筆
+- 構成: 結論→理由（最初に「何を買って何を売るか」を言い切る）
+- 「みんなが思いつく予測」はNG、「その発想はなかった」と思わせる視点
+- 画像なし、100円
+- 投資助言にあたらない内容（免責事項付き）
+- AI感のある表現NG、箇条書きに「*」使わない
 
-### PHASE 2：GitHub リポジトリ作成・Secrets 設定
-- [x] GitHubリポジトリ作成（watson0106/investment-content-auto）
-- [ ] GitHub Secrets 設定（GEMINI_API_KEY / ANTHROPIC_API_KEY / NOTE_EMAIL / NOTE_PASSWORD）
-- [ ] 動作確認（workflow_dispatch で手動実行）
+## 削除済み機能（復活させない）
+- YouTube note 下書きパイプライン
+- マガジン自動管理
+- プロフィール自動更新
+- 異常検知
+- 日次レポート通知
 
-### note投稿方式（JS API方式）✅ 動作確認済み
-- SeleniumのDOM操作ではなく内部APIをJS fetchで直接呼び出す方式
-- undetected-chromedriver + headless=false でWAFを回避
-- ログイン: `POST /api/v1/sessions/sign_in`
-- ドラフト作成: `POST /api/v1/text_notes`（editor.note.comドメインから）
-- 記事更新・公開: `PUT /api/v1/text_notes/{id}` with `{name, body, status, hashtag_list}`
-- GitHub Actions: Xvfb仮想ディスプレイで非headless実行
-- ローカルテストでWAFレートリミットに注意（連続アクセスで403）
+## 既知の問題・注意点
+- Claude CLI をsubprocessで呼ぶと、CLAUDE.mdのペルソナ指示を拾って「承知しました」等の会話応答を返す
+  → 品質検証で検出し、Geminiにフォールバックする仕組みで対処済み
+- 画像挿入: noteのProseMirrorエディタへの画像挿入は `/api/v1/image_upload` API方式を使用
+  → クリップボードペースト方式はSelenium経由で動作しないため廃止
 
 ## 技術スタック
 - ニュース収集：feedparser + BeautifulSoup（13 RSS ソース）
-- 深掘り分析：Gemini 2.5 Flash
+- 深掘り分析：Gemini 2.5 Flash（メイン）
 - 添削：Claude Opus 4.6
 - 画像生成：Gemini 3 Pro Image Preview
 - タイトル生成：Claude Opus 4.6

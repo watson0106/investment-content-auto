@@ -1,335 +1,169 @@
 """
-有料記事の自動生成・投稿（推奨銘柄IR分析レポート）
-- output/draft.json の recommended_stocks から銘柄を取得
-- Claudeで5年IR分析レポートを執筆
-- noteに有料記事として公開（¥480）
+有料記事生成モジュール
+
+無料記事の内容をもとに、具体的な投資アクションプランを提供する有料記事を生成する。
+- ペルソナ: GS出身シニアアナリスト級の分析力、ブロガー口調
+- 構成: 結論→理由
+- 画像なし、100円
 """
+
 from __future__ import annotations
 
 import json
 import os
-import re
-import subprocess
-import time
 
 from google import genai
 from google.genai import types
 
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-_BASE = os.path.join(os.path.dirname(__file__), "..")
-DEFAULT_PRICE = 480
 
 
-# ─── トピック選定 ────────────────────────────────────────────────
+def generate_paid_article(free_article: str, free_title: str) -> dict:
+    """無料記事をもとに有料記事を生成する"""
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
-def select_paid_topic() -> dict | None:
-    """
-    output/draft.json の recommended_stocks から有料記事の対象銘柄を取得。
-    recommended_stocks がなければ None を返してスキップ。
-    複数銘柄がある場合は1番目で1記事作成。
-    """
-    draft_path = os.path.join(_BASE, "output", "draft.json")
-    if not os.path.exists(draft_path):
-        print("  [有料] draft.json が見つかりません。スキップ")
-        return None
+    prompt = f"""あなたはゴールドマン・サックスで20年以上のキャリアを持つシニアアナリストであり、ウォーレン・バフェットを超えるリターンを出し続けてきた投資家です。ただし、記事は「私」一人称の個人投資家ブロガーとして書きます。
 
-    with open(draft_path, encoding="utf-8") as f:
-        draft_data = json.load(f)
+以下の無料記事を読んだ読者向けに、「で、具体的にどうすればいいの？」に答える有料記事を書いてください。
 
-    stocks = draft_data.get("recommended_stocks", [])
-    if not stocks:
-        print("  [有料] recommended_stocks が空です。有料記事スキップ")
-        return None
+【無料記事タイトル】
+{free_title}
 
-    target = stocks[0]
-    print(f"  [有料] 対象銘柄: {target}（候補{len(stocks)}件中1番目）")
-    return {
-        "target_stock": target,
-        "all_stocks": stocks,
-    }
+【絶対守るルール】
 
+1. 構成は「結論→理由」の順。最初に答えを言い切ってから、根拠を積み上げる
+2. 口語体で書く。「なんです」「正直なところ」「ここがミソで」「で、結論なんですが」みたいな口調
+3. 箇条書きには「*」を絶対に使わない。「-」も最小限。基本は文章で語る
+4. 小タイトル（セクション見出し）は ## で統一し、読者がスクロールしやすくする
+5. 「みんなが思いつく一手先の予測」は書かない。「その発想はなかった」と思わせる視点を入れる
+   - NG例: 「原油が上がればエネルギー株が上がる」→ 当たり前すぎる
+   - OK例: 「この危機の本当の受益者は実は○○で、その理由は...」
+6. エビデンスと数値に基づくが、語り口は知的な雑談のように読みやすく
+7. AI感のある表現は絶対NG。「まとめると」「以下の通りです」「それでは見ていきましょう」禁止
+8. 投資助言ではなく「私個人の分析と判断」として書く
+9. 末尾に免責事項を1行で
 
-# ─── 有料記事生成 ────────────────────────────────────────────────
+【記事構成】
 
-def build_paid_prompt(topic: dict) -> str:
-    target_stock = topic["target_stock"]
-
-    return f"""あなたはゴールドマンサックスのウォーレン・バフェットにも劣らない超優秀なアナリストです。
-銘柄コード {target_stock} について、個人投資家向けのIR分析レポートを執筆してください。
-
-【重要な禁止事項】
-- 「○○円で買い」「今が買い時」等の具体的な売買タイミングは絶対に記載禁止
-- 「今すぐ買え」「売れ」等の断定的な投資助言は禁止
-- あくまで投資判断の「材料」を提供する立場で書くこと
-
-【事前リサーチ（必須）】
-まず以下を調査してから執筆を開始してください：
-- この銘柄の正式企業名、事業内容、東証業種分類
-- 過去5年分のIR資料（有価証券報告書、決算短信、決算説明資料）
-- 業界の市場規模、主要プレイヤー、競合状況
-- 最新のアナリストレポートや市場コンセンサス
-
-【記事構成（必ずこの順番・見出しで）】
-
-## 企業概要
-
-（400字程度）
-- 正式社名、設立年、本社所在地、従業員数
-- 主要事業内容・サービス
-- 現在の時価総額、株価水準
-- 東証業種分類またはGICSセクター
+## 結論：この局面で私が実際に動かすポジション
+（最初の300字で「何を買って何を売るか」を言い切る。理由は後回し。読者が一番知りたいことを最初に）
 
 ---
 
-## 5年IR分析
-
-（1000字程度。IR資料に基づく事実ベースの分析）
-- 売上高・営業利益・純利益の5年推移（具体的な数値で）
-- 売上高成長率・営業利益率の推移
-- ROE・ROAの推移と変動要因
-- キャッシュフロー分析（営業CF、投資CF、FCF）
-- 配当推移・配当性向・自社株買い実績
+## なぜ「みんなが売ってるとき」に私はこう動くのか
+（逆張りの根拠。過去の類似局面のデータ。具体的な数字で裏付ける）
 
 ---
 
-## 業界と競合分析
-
-（600字程度）
-- 属する業界の市場規模と成長率
-- 主要プレイヤー3〜5社との比較
-- 市場シェアとポジショニング
-- 業界の構造変化（新規参入、統合、技術革新）
+## 市場が見落としている「本当の受益者」
+（ここが記事の核。誰も言ってないけど論理的に正しい視点。二次的・三次的効果から導き出される意外な恩恵セクターや銘柄）
 
 ---
 
-## 成長シナリオ
-
-（800字程度。3シナリオを定量的に提示）
-
-### ブルシナリオ（強気）
-- 前提条件、売上・利益の想定水準、確度
-
-### ベースシナリオ（中立）
-- 前提条件、売上・利益の想定水準、確度
-
-### ベアシナリオ（弱気）
-- 前提条件、売上・利益の想定水準、確度
+## 具体的なトリガー価格と行動プラン
+（「もし○○が○○ドル/円を超えたら→私は○○を○○%売って○○に振り替える。なぜなら...」をセットで。文章で語る）
 
 ---
 
-## リスク分析
-
-（500字程度）
-- 規制リスク（法改正、許認可、コンプライアンス）
-- 競合リスク（新規参入、価格競争、技術代替）
-- マクロリスク（為替、金利、景気サイクル、地政学）
-- 固有リスク（経営陣、ガバナンス、訴訟、特定顧客依存）
+## 今週の私のウォッチリスト
+（5つの指標と「この数字がこうなったら動く」という具体的なライン。文章で語る）
 
 ---
 
-## 注目KPI
-
-（400字程度）
-- この銘柄を追跡する上で投資家が注視すべき指標を5〜8個
-- 各KPIの現在値、過去推移、なぜ重要かを簡潔に
-
----
-
-## バリュエーション
-
-（600字程度）
-- PER、PBR、PSR、EV/EBITDA等の主要指標
-- 同業他社との比較（具体的な数値で）
-- 過去5年の自社バリュエーション推移
-- 現在の水準が割高/割安かの定量的評価
-
----
-
-## 私の見解
-
-（400字程度）
-- なぜこの銘柄に注目しているのか
-- どういうタイプの投資家に向いている銘柄か（成長株志向、配当志向、バリュー志向等）
-- 投資判断にあたって最も重視すべきポイント
-- ※売買推奨ではなく、あくまで筆者個人の分析視点として
-
----
-
-## まとめ
-
-（箇条書き5〜7項目。数値を交えて要点整理）
+本記事は筆者個人の分析・見解であり、特定の金融商品の売買を推奨するものではありません。投資判断はご自身の責任で行ってください。
 
 【執筆ルール】
-- 全体で5000字以上
-- 具体的な数値・事実を重視（「高い」ではなく「15.3%」）
-- IR資料に基づく客観的事実を軸に記述
-- 売買タイミングや価格目標は一切記載しない
-- 投資助言にならないよう、判断材料の提供に留める
-- 専門用語は都度説明
+- 全体で8000字以上
 - 絵文字NG
-- 冒頭に前置き不要。最初の文字は「## 企業概要」で始めること
+- 記事本文のみを出力（前置き不要）
+- 最初の文字は「##」で始めること
 
-【免責表記（記事末尾に必ず記載）】
-※本記事は特定の金融商品の売買を推奨するものではありません。投資判断はご自身の責任で行ってください。記載された情報は執筆時点のものであり、正確性を保証するものではありません。"""
+【無料記事全文（参考）】
+{free_article[:8000]}"""
+
+    print("  Gemini で有料記事を執筆中...")
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0.6, max_output_tokens=30000),
+    )
+    article = response.text.strip()
+    print(f"  有料記事生成完了（{len(article)} 文字）")
+
+    title = generate_paid_title(free_title, article[:500])
+
+    return {
+        "article": article,
+        "title": title,
+    }
 
 
-def generate_paid_article_text(topic: dict) -> str:
-    """Claude CLI で有料記事を生成（Gemini フォールバック付き）"""
-    prompt = build_paid_prompt(topic)
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+def generate_paid_title(free_title: str, article_summary: str) -> str:
+    """有料記事のタイトルを生成"""
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
-    draft = ""
-    import shutil
-    claude_path = shutil.which("claude")
-    if claude_path:
-        print("  Claude CLI で有料記事執筆中...")
-        result = subprocess.run(
-            [claude_path, "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, env=env,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            draft = result.stdout.strip()
-            print(f"  Claude 執筆完了（{len(draft)} 文字）")
-        else:
-            print(f"  [WARN] Claude CLI 失敗: {result.stderr[:200]}")
+    prompt = f"""以下の無料記事のタイトルに対応する「有料記事」のタイトルを1つだけ生成してください。
 
-    if not draft:
-        print("  Gemini で有料記事執筆中（フォールバック）...")
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        resp = client.models.generate_content(
+【無料記事タイトル】
+{free_title}
+
+【有料記事の内容（冒頭）】
+{article_summary}
+
+【ルール】
+- 無料記事の読者が「これも読みたい」と思うタイトル
+- 「具体的なアクション」「私のポジション」が含まれていることが伝わる
+- 40字以内
+- タイトルのみ出力（説明不要）"""
+
+    try:
+        response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.6, max_output_tokens=8000),
+            config=types.GenerateContentConfig(temperature=0.3, max_output_tokens=100),
         )
-        draft = resp.text.strip()
-        print(f"  Gemini 執筆完了（{len(draft)} 文字）")
+        title = response.text.strip().strip('"').strip("'")
+        if title and len(title) >= 5:
+            print(f"  有料記事タイトル: {title}")
+            return title
+    except Exception as e:
+        print(f"  [WARN] タイトル生成失敗: {e}")
 
-    # クリーンアップ
-    from deep_research import clean_article
-    return clean_article(draft)
-
-
-# ─── 有料記事投稿 ────────────────────────────────────────────────
-
-def post_paid_to_note(title: str, body: str, price: int = DEFAULT_PRICE) -> str:
-    """note に有料記事として公開し URL を返す"""
-    import post_to_note
-    headless = os.environ.get("HEADLESS", "true").lower() == "true"
-
-    url = post_to_note.post_article(
-        title=title,
-        body=body,
-        image_paths=[],
-        tags=["投資", "有料記事", "IR分析", "個別銘柄分析", "企業分析"],
-        headless=headless,
-        cover_path=None,
-        price=price,
-    )
-    return url
+    return f"{free_title}｜私の具体的な投資判断を公開"
 
 
-def create_paid_article_for_stock(target_stock: str, free_summary: str = "") -> dict:
-    """推奨銘柄に対してIR分析レポートを生成・公開する"""
-    topic = {
-        "target_stock": target_stock,
-    }
-    title = f"【IR分析】{target_stock} 5年財務分析と成長シナリオ"
-    print(f"  [有料] {target_stock} のIR分析レポートを生成中...")
-    article_text = generate_paid_article_text(topic)
-    url = post_paid_to_note(title, article_text, price=DEFAULT_PRICE)
+def build_free_article_cta(paid_url: str) -> str:
+    """無料記事末尾に追加する有料記事への導線テキスト"""
+    return f"""
 
-    if url:
-        m = re.search(r"/n/([a-zA-Z0-9]+)$", url)
-        if m:
-            try:
-                from pdca_tracker import record_posted_article
-                record_posted_article(
-                    note_key=m.group(1),
-                    title=title,
-                    source_news=[target_stock],
-                    is_paid=True,
-                    price=DEFAULT_PRICE,
-                )
-            except Exception as e:
-                print(f"  [WARN] パフォーマンスDB登録失敗: {e}")
+---
 
-    result = {
-        "target_stock": target_stock,
-        "title": title,
-        "url": url,
-        "price": DEFAULT_PRICE,
-        "status": "success" if url else "failed",
-    }
+## この記事の「具体的な投資アクション」を知りたい方へ
 
-    # output/paid_posted.json に保存（main.py が無料記事に追記するため）
-    out_path = os.path.join(_BASE, "output", "paid_posted.json")
-    with open(out_path, "w", encoding="utf-8") as f:
+本記事で分析したテーマについて、具体的にどうポジションを動かすか、トリガー価格と行動プランをまとめた記事を公開しています。
+
+{paid_url}
+"""
+
+
+def main():
+    """有料記事生成のスタンドアロン実行"""
+    print("=== 有料記事生成 ===")
+
+    with open("output/polished.json", encoding="utf-8") as f:
+        polished = json.load(f)
+    with open("output/final.json", encoding="utf-8") as f:
+        final = json.load(f)
+
+    free_article = polished.get("polished", "")
+    free_title = final.get("title", "")
+
+    result = generate_paid_article(free_article, free_title)
+
+    with open("output/paid_draft.json", "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
-    return result
-
-
-# ─── メイン ─────────────────────────────────────────────────────
-
-def main() -> dict:
-    print("=== 有料記事生成・投稿（IR分析レポート） ===")
-
-    topic = select_paid_topic()
-    if not topic:
-        print("  有料記事スキップ（対象銘柄なし）")
-        return {}
-
-    target_stock = topic["target_stock"]
-    title = f"【IR分析】{target_stock} 5年財務分析と成長シナリオ"
-    print(f"  有料記事タイトル: {title}")
-
-    article_text = generate_paid_article_text(topic)
-
-    url = post_paid_to_note(title, article_text, price=DEFAULT_PRICE)
-
-    # パフォーマンスDBに登録
-    if url:
-        m = re.search(r"/n/([a-zA-Z0-9]+)$", url)
-        if m:
-            try:
-                from pdca_tracker import record_posted_article
-                record_posted_article(
-                    note_key=m.group(1),
-                    title=title,
-                    source_news=[target_stock],
-                    is_paid=True,
-                    price=DEFAULT_PRICE,
-                )
-            except Exception:
-                pass
-            try:
-                from pdca_tracker import load_strategy_state, save_strategy_state
-                from datetime import datetime, timezone, timedelta
-                JST = timezone(timedelta(hours=9))
-                state = load_strategy_state()
-                state.setdefault("paid_article_history", []).append({
-                    "date": datetime.now(JST).strftime("%Y-%m-%d"),
-                    "title": title,
-                    "note_key": m.group(1),
-                    "price": DEFAULT_PRICE,
-                    "target_stock": target_stock,
-                })
-                save_strategy_state(state)
-            except Exception:
-                pass
-
-    result = {
-        "target_stock": target_stock,
-        "title": title,
-        "url": url,
-        "price": DEFAULT_PRICE,
-        "status": "success" if url else "failed",
-    }
-    out_path = os.path.join(_BASE, "output", "paid_posted.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-
-    print(f"\n{'有料記事公開: ' + url if url else '有料記事投稿失敗'}")
+    print(f"保存: output/paid_draft.json")
     return result
 
 

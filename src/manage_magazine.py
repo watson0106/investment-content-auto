@@ -50,23 +50,103 @@ def _save_status(status: dict) -> None:
 def get_magazine_id_via_api(driver) -> str | None:
     """note APIでマガジンIDを取得"""
     driver.set_script_timeout(15)
+
+    # 方法1: /api/v1/me/magazines を試す（r.text() で安全にパース）
     result = driver.execute_async_script("""
         var done = arguments[arguments.length - 1];
         fetch('/api/v1/me/magazines', {
             credentials: 'same-origin',
-            headers: {'x-requested-with': 'XMLHttpRequest'}
+            headers: {
+                'Accept': 'application/json',
+                'x-requested-with': 'XMLHttpRequest'
+            }
         })
-        .then(r => r.json().then(d => done({status: r.status, data: d})))
-        .catch(e => done({error: e.toString()}));
+        .then(function(r) {
+            return r.text().then(function(t) { done({status: r.status, text: t}); });
+        })
+        .catch(function(e) { done({error: e.toString()}); });
     """)
-    if result and result.get("status") == 200:
-        magazines = result.get("data", {}).get("data", {}).get("magazines", [])
-        if magazines:
-            mag = magazines[0]
-            mag_id = mag.get("id") or mag.get("key")
-            print(f"  マガジン取得: id={mag_id} name={mag.get('name','')}")
+
+    mag_id = _parse_magazine_response(result)
+    if mag_id:
+        return mag_id
+
+    print(f"  [INFO] /api/v1/me/magazines 失敗 (status={result.get('status') if result else 'None'}), ユーザー情報APIで再試行...")
+
+    # 方法2: ユーザー情報からurlnameを取得し、公開マガジン一覧を取得
+    result2 = driver.execute_async_script("""
+        var done = arguments[arguments.length - 1];
+        fetch('/api/v1/me', {
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'x-requested-with': 'XMLHttpRequest'
+            }
+        })
+        .then(function(r) {
+            return r.text().then(function(t) { done({status: r.status, text: t}); });
+        })
+        .catch(function(e) { done({error: e.toString()}); });
+    """)
+
+    if result2 and result2.get("status") == 200 and result2.get("text"):
+        try:
+            me_data = json.loads(result2["text"])
+            urlname = me_data.get("data", {}).get("urlname") or me_data.get("urlname")
+            if urlname:
+                result3 = driver.execute_async_script(f"""
+                    var done = arguments[arguments.length - 1];
+                    fetch('/api/v2/creators/{urlname}/magazines', {{
+                        credentials: 'same-origin',
+                        headers: {{
+                            'Accept': 'application/json',
+                            'x-requested-with': 'XMLHttpRequest'
+                        }}
+                    }})
+                    .then(function(r) {{
+                        return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
+                    }})
+                    .catch(function(e) {{ done({{error: e.toString()}}); }});
+                """)
+                mag_id = _parse_magazine_response(result3)
+                if mag_id:
+                    return mag_id
+                print(f"  [INFO] /api/v2/creators/{urlname}/magazines 失敗: {result3}")
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"  [WARN] ユーザー情報パース失敗: {e}")
+
+    print(f"  [WARN] マガジンID取得失敗（全方法）")
+    return None
+
+
+def _parse_magazine_response(result: dict | None) -> str | None:
+    """APIレスポンスからマガジンIDを抽出する共通ヘルパー"""
+    if not result or result.get("error"):
+        return None
+    if result.get("status") != 200:
+        return None
+    text = result.get("text", "")
+    if not text or not text.strip():
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+    # レスポンス構造は {"data": {"magazines": [...]}} または {"data": [...]}
+    inner = data.get("data", data)
+    magazines = []
+    if isinstance(inner, dict):
+        magazines = inner.get("magazines", [])
+    elif isinstance(inner, list):
+        magazines = inner
+
+    if magazines:
+        mag = magazines[0]
+        mag_id = mag.get("id") or mag.get("key")
+        if mag_id:
+            print(f"  マガジン取得: id={mag_id} name={mag.get('name', '')}")
             return str(mag_id)
-    print(f"  [WARN] マガジンID取得失敗: {result}")
     return None
 
 

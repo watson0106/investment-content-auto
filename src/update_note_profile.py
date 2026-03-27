@@ -1,7 +1,7 @@
 """
 note プロフィール自動更新
 - 初回のみ（またはPDCA分析で改善が必要な場合）実行
-- Seleniumでプロフィールページにアクセスして更新
+- JS API方式（/api/v1/me）でプロフィールを更新
 """
 from __future__ import annotations
 
@@ -54,58 +54,119 @@ def mark_profile_updated() -> None:
         json.dump({"updated_at": datetime.now(JST).isoformat()}, f)
 
 
-# ─── Selenium でプロフィール更新 ─────────────────────────────────
+# ─── JS API方式でプロフィール更新 ─────────────────────────────────
 
 def update_profile_with_driver(driver, wait) -> bool:
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support import expected_conditions as EC
-
+    """JS API方式でプロフィールを更新する。
+    note.comドメインにいる状態で /api/v1/me へPUTリクエストを送る。
+    """
     try:
-        print("  プロフィールページを開いています...")
+        # note.comドメインに遷移（ログイン済み状態）
+        print("  note.comドメインに遷移中...")
+        driver.get("https://note.com/dashboard")
+        time.sleep(3)
+
+        # まず現在のプロフィール情報を取得して確認
+        print("  現在のプロフィール情報を取得中...")
+        driver.set_script_timeout(20)
+        get_result = driver.execute_async_script("""
+            var done = arguments[arguments.length - 1];
+            fetch('/api/v1/me', {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'x-requested-with': 'XMLHttpRequest'
+                }
+            })
+            .then(function(r) {
+                return r.text().then(function(t) { done({status: r.status, text: t}); });
+            })
+            .catch(function(e) { done({error: e.toString()}); });
+        """)
+
+        if not get_result or get_result.get("status") not in (200, 201):
+            print(f"  [WARN] プロフィール取得失敗 (status={get_result.get('status') if get_result else 'None'})")
+            # 取得失敗でも更新は試みる
+        else:
+            import json as _json
+            try:
+                me_data = _json.loads(get_result["text"])
+                current_nick = me_data.get("data", {}).get("nickname", "不明")
+                print(f"  現在のニックネーム: {current_nick}")
+            except Exception:
+                pass
+
+        # プロフィールを更新（JS API方式）
+        print(f"  プロフィール更新中（ニックネーム: {PROFILE_NICKNAME}）...")
+        import json as _json
+        update_payload = _json.dumps({
+            "nickname": PROFILE_NICKNAME,
+            "profile": PROFILE_TEXT,
+        }, ensure_ascii=False)
+
+        update_result = driver.execute_async_script("""
+            var done = arguments[arguments.length - 1];
+            var payload = arguments[0];
+            fetch('/api/v1/me', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'x-requested-with': 'XMLHttpRequest'
+                },
+                body: payload
+            })
+            .then(function(r) {
+                return r.text().then(function(t) { done({status: r.status, text: t}); });
+            })
+            .catch(function(e) { done({error: e.toString()}); });
+        """, update_payload)
+
+        if update_result and update_result.get("status") in (200, 201):
+            print("  プロフィール更新成功（API）")
+            return True
+
+        # /api/v1/me が失敗した場合、設定ページ経由のAPIを試す
+        print(f"  [WARN] /api/v1/me PUT失敗 (status={update_result.get('status') if update_result else 'None'})")
+        print(f"  レスポンス: {str(update_result.get('text', ''))[:300]}")
+
+        # 設定ページに遷移してCSRFトークン付きで再試行
+        print("  設定ページ経由で再試行中...")
         driver.get("https://note.com/settings/profile")
         time.sleep(3)
 
-        # ニックネーム
-        try:
-            nick = wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, 'input[name="nickname"], input[placeholder*="ニックネーム"], input[placeholder*="名前"]')
-            ))
-            driver.execute_script("""
-                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                setter.call(arguments[0], arguments[1]);
-                arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
-            """, nick, PROFILE_NICKNAME)
-            time.sleep(0.5)
-        except Exception as e:
-            print(f"  [WARN] ニックネーム設定失敗: {e}")
+        update_result2 = driver.execute_async_script("""
+            var done = arguments[arguments.length - 1];
+            var payload = arguments[0];
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            var headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'x-requested-with': 'XMLHttpRequest'
+            };
+            if (csrfToken) { headers['x-csrf-token'] = csrfToken; }
+            fetch('/api/v1/me', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: headers,
+                body: payload
+            })
+            .then(function(r) {
+                return r.text().then(function(t) { done({status: r.status, text: t}); });
+            })
+            .catch(function(e) { done({error: e.toString()}); });
+        """, update_payload)
 
-        # 自己紹介文
-        try:
-            bio = driver.find_element(By.CSS_SELECTOR,
-                'textarea[name="profile"], textarea[placeholder*="自己紹介"], textarea[name="description"]'
-            )
-            driver.execute_script("""
-                var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-                setter.call(arguments[0], arguments[1]);
-                arguments[0].dispatchEvent(new Event('input', {bubbles: true}));
-                arguments[0].dispatchEvent(new Event('change', {bubbles: true}));
-            """, bio, PROFILE_TEXT)
-            time.sleep(0.5)
-        except Exception as e:
-            print(f"  [WARN] 自己紹介文設定失敗: {e}")
-
-        # 保存ボタン
-        try:
-            save_btn = driver.find_element(By.XPATH,
-                "//button[contains(.,'保存') or contains(.,'更新') or contains(.,'変更')]"
-            )
-            driver.execute_script("arguments[0].click();", save_btn)
-            time.sleep(2)
-            print("  プロフィール保存完了")
+        if update_result2 and update_result2.get("status") in (200, 201):
+            print("  プロフィール更新成功（CSRF付きAPI）")
             return True
-        except Exception as e:
-            print(f"  [WARN] 保存ボタン見つからず: {e}")
-            return False
+
+        print(f"  [WARN] プロフィール更新失敗 (status={update_result2.get('status') if update_result2 else 'None'})")
+        print(f"  レスポンス: {str(update_result2.get('text', ''))[:300]}")
+        return False
 
     except Exception as e:
         print(f"  [WARN] プロフィール更新失敗: {e}")

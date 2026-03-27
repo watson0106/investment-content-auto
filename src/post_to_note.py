@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import re
 import subprocess
+import sys
 import time
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -59,7 +61,7 @@ def login(driver, wait: WebDriverWait):
     print("  note にログイン中...")
     driver.get("https://note.com/login")
     time.sleep(3)
-    driver.set_script_timeout(15)
+    driver.set_script_timeout(30)
     result = driver.execute_async_script(f"""
         var done = arguments[arguments.length - 1];
         fetch('/api/v1/sessions/sign_in', {{
@@ -103,21 +105,143 @@ def login(driver, wait: WebDriverWait):
             raise Exception("ログイン失敗。メール・パスワードを確認してください")
 
 
-def paste_image_from_clipboard(driver, editor_el, image_path: str) -> bool:
-    """osascriptでクリップボードに画像をセットしてエディタにペースト"""
-    try:
-        abs_path = os.path.abspath(image_path)
+def _copy_image_to_clipboard(abs_path: str) -> None:
+    """OS に応じて画像ファイルをクリップボードにコピーする"""
+    system = platform.system()
+    if system == "Darwin":
+        # macOS
         subprocess.run(
             ["osascript", "-e", f'set the clipboard to POSIX file "{abs_path}"'],
-            check=True
+            check=True,
         )
-        time.sleep(0.8)
-        editor_el.send_keys(Keys.COMMAND + "v")
-        time.sleep(4)  # アップロード完了を待つ
-        return True
-    except Exception as e:
-        print(f"  [WARN] 画像ペースト失敗: {e}")
+    elif system == "Windows":
+        # Windows: PowerShell で画像をクリップボードにコピー
+        ps_script = (
+            f'Add-Type -AssemblyName System.Windows.Forms;'
+            f'[System.Windows.Forms.Clipboard]::SetImage('
+            f'[System.Drawing.Image]::FromFile("{abs_path}"))'
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_script],
+            check=True,
+        )
+    else:
+        # Linux (GitHub Actions 等): xclip を使用
+        subprocess.run(
+            ["xclip", "-selection", "clipboard", "-t", "image/png", "-i", abs_path],
+            check=True,
+        )
+
+
+def insert_image_to_editor(driver, image_path: str) -> bool:
+    """
+    画像をnoteのProseMirrorエディタに挿入する。
+    方法: Base64 → File → drop/pasteイベントで ProseMirror のアップロードハンドラを起動
+    挿入後にimgタグがDOMに実際に存在するか検証する。
+    """
+    import base64
+    abs_path = os.path.abspath(image_path)
+    if not os.path.exists(abs_path):
+        print(f"    [FAIL] 画像ファイルが存在しない: {abs_path}")
         return False
+
+    with open(abs_path, "rb") as f:
+        img_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+    fname = os.path.basename(abs_path)
+    mime = "image/png" if fname.endswith(".png") else "image/jpeg"
+
+    # 挿入前のimg数を記録
+    before_count = len(driver.find_elements(By.CSS_SELECTOR, ".ProseMirror img"))
+
+    # paste イベントでProseMirrorのアップロードハンドラを起動
+    driver.set_script_timeout(30)
+    try:
+        paste_result = driver.execute_async_script("""
+        var done = arguments[arguments.length - 1];
+        var b64 = arguments[0];
+        var fname = arguments[1];
+        var mime = arguments[2];
+
+        var byteChars = atob(b64);
+        var byteArr = new Uint8Array(byteChars.length);
+        for (var i = 0; i < byteChars.length; i++) {
+            byteArr[i] = byteChars.charCodeAt(i);
+        }
+        var blob = new Blob([byteArr], {type: mime});
+        var file = new File([blob], fname, {type: mime});
+
+        var editor = document.querySelector('.ProseMirror');
+        if (!editor) { done('no_editor'); return; }
+        editor.focus();
+
+        var dt = new DataTransfer();
+        dt.items.add(file);
+
+        var pasteEvt = new ClipboardEvent('paste', {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: dt
+        });
+        editor.dispatchEvent(pasteEvt);
+
+        var attempts = 0;
+        var beforeImgs = editor.querySelectorAll('img').length;
+        var checkInterval = setInterval(function() {
+            attempts++;
+            var currentImgs = editor.querySelectorAll('img').length;
+            if (currentImgs > beforeImgs) {
+                clearInterval(checkInterval);
+                done('paste_ok');
+            } else if (attempts > 20) {
+                clearInterval(checkInterval);
+                done('paste_timeout');
+            }
+        }, 500);
+    """, img_b64, fname, mime)
+
+    except Exception as e:
+        paste_result = f"exception: {e}"
+
+    if paste_result == "paste_ok":
+        time.sleep(1)
+        return True
+
+    # フォールバック: file input を探して直接送信
+    print(f"    paste方式失敗({paste_result})、file input方式を試行...")
+    try:
+        # エディタ内の "+" ボタンまたは画像追加ボタンをクリック
+        plus_btns = driver.find_elements(By.CSS_SELECTOR,
+            "button[data-testid='add-block'], .ProseMirror + button, "
+            "[class*='add'], [class*='plus'], [aria-label*='追加']"
+        )
+        for btn in plus_btns:
+            try:
+                driver.execute_script("arguments[0].click();", btn)
+                time.sleep(1)
+                break
+            except Exception:
+                continue
+
+        # file input を探してファイルパスを送信
+        file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file'][accept*='image']")
+        if not file_inputs:
+            file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
+
+        if file_inputs:
+            file_inputs[-1].send_keys(abs_path)
+            time.sleep(5)
+            after_count = len(driver.find_elements(By.CSS_SELECTOR, ".ProseMirror img"))
+            if after_count > before_count:
+                return True
+            print(f"    file input方式: img数変化なし ({before_count} → {after_count})")
+        else:
+            print(f"    file input が見つからない")
+    except Exception as e:
+        print(f"    file input方式失敗: {e}")
+
+    print(f"    [FAIL] 全方式で画像挿入に失敗")
+    return False
 
 
 def set_react_textarea(driver, element, value: str):
@@ -352,56 +476,124 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         time.sleep(0.5)
 
         img_count = 0
+        img_success = 0
         for part in parts:
             m2 = re.match(r'__IMAGE_(\d+)__', part.strip())
             if m2:
                 idx = int(m2.group(1))
                 if idx < len(image_paths) and image_paths[idx]:
                     img_path = image_paths[idx]
-                    print(f"  [{img_count+1}/{len(image_paths)}] 画像をペースト中: {os.path.basename(img_path)}")
-                    editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
-                    ok = paste_image_from_clipboard(driver, editor_el, img_path)
+                    img_count += 1
+                    print(f"  [{img_count}/{len(image_paths)}] 画像挿入中: {os.path.basename(img_path)}")
+                    ok = insert_image_to_editor(driver, img_path)
                     if ok:
+                        img_success += 1
+                        print(f"    [OK] 画像{img_count} 挿入確認済み（DOM上にimgタグあり）")
+                        # キャプション入力モードを抜けるためにEnterを2回押す
                         editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
                         editor_el.send_keys(Keys.RETURN)
                         time.sleep(0.3)
-                        print(f"    [OK] 画像{img_count+1} 挿入完了")
-                    img_count += 1
+                        editor_el.send_keys(Keys.RETURN)
+                        time.sleep(0.3)
+                    else:
+                        print(f"    [FAIL] 画像{img_count} 挿入失敗（DOM上にimgタグ増えず）")
             elif part.strip():
                 insert_section_with_headings(driver, part.strip())
                 time.sleep(0.3)
+
+        # 最終検証: エディタ内のimg数を確認
+        final_img_count = len(driver.find_elements(By.CSS_SELECTOR, ".ProseMirror img"))
+        print(f"\n  画像挿入結果: {img_success}/{img_count} 成功（エディタ内img数: {final_img_count}）")
+        if img_count > 0 and img_success == 0:
+            print("  [WARN] 画像が1枚も挿入できませんでした")
 
         time.sleep(2)
 
         if price > 0:
             # 有料公開: note API で price を設定して公開
-            print(f"  有料記事として公開中（¥{price}）...")
+            print(f"  有料記事として公開中（{price}円）...")
             driver.set_script_timeout(20)
-            pub_result = driver.execute_async_script(f"""
-                var done = arguments[arguments.length - 1];
-                fetch('/api/v1/text_notes/{note_key}', {{
-                    method: 'PUT',
-                    credentials: 'include',
-                    headers: {{
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'x-requested-with': 'XMLHttpRequest'
-                    }},
-                    body: JSON.stringify({{
-                        status: 'public',
-                        price: {price},
-                        hashtag_list: {json.dumps(tags)}
+            # まず下書き保存
+            try:
+                draft_btn = wait.until(EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(., '下書き保存')]")
+                ))
+                driver.execute_script("arguments[0].click();", draft_btn)
+                time.sleep(3)
+                print("  下書き保存完了")
+            except Exception:
+                time.sleep(3)
+
+            # 有料設定: エディタUIの「公開設定」から有料を設定
+            print(f"  有料設定中（{price}円）...")
+            try:
+                # 「公開設定」や「販売設定」ボタンを探す
+                setting_btns = driver.find_elements(By.XPATH,
+                    "//button[contains(., '公開設定') or contains(., '販売設定') or contains(., '有料')]"
+                )
+                if not setting_btns:
+                    # 「…」メニューや歯車アイコンを試す
+                    setting_btns = driver.find_elements(By.CSS_SELECTOR,
+                        "[aria-label*='設定'], [class*='setting'], [class*='menu']"
+                    )
+
+                if setting_btns:
+                    driver.execute_script("arguments[0].click();", setting_btns[0])
+                    time.sleep(2)
+
+                # 有料ラジオボタン/チェックボックスを探す
+                paid_opts = driver.find_elements(By.XPATH,
+                    "//*[contains(text(), '有料') or contains(text(), '販売')]"
+                )
+                for opt in paid_opts:
+                    try:
+                        driver.execute_script("arguments[0].click();", opt)
+                        time.sleep(1)
+                        break
+                    except Exception:
+                        continue
+
+                # 価格入力フィールドを探して入力
+                price_inputs = driver.find_elements(By.CSS_SELECTOR,
+                    "input[name*='price'], input[placeholder*='価格'], input[type='number']"
+                )
+                if price_inputs:
+                    price_inputs[0].clear()
+                    price_inputs[0].send_keys(str(price))
+                    time.sleep(1)
+                    print(f"  価格 {price}円 を入力")
+
+                # note API経由で有料設定（エディタページに戻ってからAPIを叩く）
+                driver.get(f"https://editor.note.com/notes/{note_key}/edit/")
+                time.sleep(3)
+                driver.set_script_timeout(20)
+                pub_result = driver.execute_async_script(f"""
+                    var done = arguments[arguments.length - 1];
+                    fetch('/api/v1/text_notes/{note_key}', {{
+                        method: 'PUT',
+                        credentials: 'include',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'x-requested-with': 'XMLHttpRequest'
+                        }},
+                        body: JSON.stringify({{
+                            price: {price}
+                        }})
                     }})
-                }})
-                .then(function(r) {{
-                    return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
-                }})
-                .catch(function(e) {{ done({{error: e.toString()}}); }});
-            """)
-            if pub_result and pub_result.get("status") in (200, 201):
-                print(f"  有料公開成功 (¥{price})")
-            else:
-                print(f"  [WARN] 有料公開API失敗 (status={pub_result.get('status') if pub_result else 'None'})。下書き保存にフォールバック")
+                    .then(function(r) {{
+                        return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
+                    }})
+                    .catch(function(e) {{ done({{error: e.toString()}}); }});
+                """)
+                if pub_result and pub_result.get("status") in (200, 201):
+                    print(f"  有料設定成功 ({price}円)")
+                else:
+                    print(f"  [WARN] 有料設定: status={pub_result.get('status') if pub_result else 'None'}")
+                    print(f"  noteのエディタから手動で{price}円に設定してください")
+            except Exception as e:
+                print(f"  [WARN] 有料設定失敗: {e}")
+                print(f"  noteのエディタから手動で{price}円に設定してください")
                 try:
                     draft_btn = wait.until(EC.element_to_be_clickable(
                         (By.XPATH, "//button[contains(., '下書き保存')]")
