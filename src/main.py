@@ -95,15 +95,6 @@ def verify_posted_article(url: str | None, note_key: str | None):
         checks.append((f"見出し{heading_count}個（3個未満）", False))
         print(f"  [FAIL] 見出しが少ない: {heading_count}個")
 
-    # 6. 画像プレースホルダーが本文に含まれているか
-    image_placeholders = len([1 for m in __import__('re').finditer(r'__IMAGE_\d+__', article_text)])
-    if expected_images > 0:
-        if image_placeholders >= expected_images:
-            checks.append((f"画像プレースホルダー{image_placeholders}個", True))
-        else:
-            checks.append((f"画像プレースホルダー{image_placeholders}/{expected_images}個", False))
-            print(f"  [FAIL] 画像プレースホルダー不足")
-
     # 結果表示
     passed = sum(1 for _, ok in checks if ok)
     total = len(checks)
@@ -129,11 +120,10 @@ def run_pipeline():
 
     steps = [
         ("① ニュース収集",              collect_news.main),
-        ("② Claude 記事執筆（個人視点）", deep_research.main),
-        ("③ クリーンアップ",             fact_check.main),
-        ("④ 画像生成",                  generate_images.main),
-        ("⑤ タイトル生成（動的）",       generate_title.main),
-        ("⑥ note 投稿（無料）",          post_to_note.main),
+        ("② Gemini 記事執筆",           deep_research.main),
+        ("③ Claude 添削",               fact_check.main),
+        ("④ タイトル生成",              generate_title.main),
+        ("⑤ note 投稿（無料）",          post_to_note.main),
     ]
 
     posted_note_key = None

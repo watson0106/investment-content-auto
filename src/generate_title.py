@@ -141,8 +141,12 @@ def select_best_title(titles: list[str], strategy_state: dict = None) -> str:
 def main():
     print("=== ⑤ タイトル生成 ===")
 
-    with open("output/article_with_images.json", encoding="utf-8") as f:
+    # polished.json を読む（画像生成ステップは廃止）
+    with open("output/polished.json", encoding="utf-8") as f:
         data = json.load(f)
+    # polished.json は "polished" キーに本文がある
+    if "polished" in data and "article" not in data:
+        data["article"] = data["polished"]
 
     # strategy_state を読み込んでタイトル選択に活用
     strategy_state = {}
@@ -161,9 +165,9 @@ def main():
         "title":        best_title,
         "title_options": titles,
         "article":      data["article"],
-        "image_paths":  data.get("image_paths", []),
-        "cover_path":   data.get("cover_path"),
-        "articles":     data["articles"],
+        "image_paths":  [],
+        "cover_path":   None,
+        "articles":     data.get("articles", []),
     }
 
     out_path = "output/final.json"
