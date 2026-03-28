@@ -1,7 +1,9 @@
 """
-② Claude で記事執筆（メイン）
-収集したニュースを Claude CLI で直接記事に仕上げる。
-Gemini はフォールバック用。
+② 記事執筆（2本）
+仕様: note自動投稿パイプライン 運用ルール に準拠
+- 2本の記事を2つの独立したトピックで執筆
+- 7セクション構成
+- 有料マガジンへの誘導
 """
 
 from __future__ import annotations
@@ -11,304 +13,340 @@ import os
 import re
 import subprocess
 
-from google import genai
-from google.genai import types
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+MAGAZINE_URL = "https://note.com/kawasewatson0106/m/me3bdb7d529fc"
 
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+FIXED_TAGS = ["投資", "株式投資", "資産運用", "米国株", "日本株"]
+TOPIC_TAGS_OPTIONS = ["為替", "FRB", "金利", "決算", "マクロ経済", "エネルギー", "半導体", "日銀", "円安", "円高"]
 
 
 def clean_article(text: str) -> str:
-    """
-    記事テキストの後処理:
-    - 冒頭の謎の紹介文（## 見出しより前の地の文）を除去
-    - 3行以上連続する空行を最大1行に圧縮
-    """
-    # 冒頭の謎テキスト除去: 最初の ## 見出しより前にある文章を削除
     first_heading = re.search(r'^#{1,3}\s', text, re.MULTILINE)
     if first_heading and first_heading.start() > 0:
         before = text[:first_heading.start()].strip()
-        # 短い区切り線（---）だけなら消す、長い前置き文章なら消す
         if before and not re.fullmatch(r'[-\s]*', before):
             text = text[first_heading.start():]
-
-    # 3行以上の連続空行 → 1行に圧縮
     text = re.sub(r'\n{3,}', '\n\n', text)
-
-    # 行末の余分なスペースを除去
     text = '\n'.join(line.rstrip() for line in text.split('\n'))
-
     return text.strip()
 
 
-def extract_recommended_stocks(article_text: str) -> list[dict]:
-    """
-    記事本文から推奨銘柄を構造化抽出する。
-    Claude CLI → Gemini フォールバック。最大3銘柄。
-    返り値: [{"ticker": "AAPL", "name": "Apple", "reason": "..."}, ...]
-    """
-    extraction_prompt = f"""以下の投資記事から、記事内で言及・推奨されている銘柄を最大3つ抽出してください。
-
-【出力形式】JSON配列のみを出力（説明文不要）:
-[{{"ticker": "AAPL", "name": "Apple", "reason": "iPhone売上好調で今後の成長が期待される"}}, ...]
-
-ルール:
-- tickerはティッカーシンボル（米国株）または証券コード（日本株4桁）
-- nameは企業名またはETF名
-- reasonは記事内での言及理由を1文で
-- 記事内に具体的な銘柄言及がなければ空配列 [] を返す
-- 最大3銘柄まで
-
-【記事本文】
-{article_text[:6000]}"""
-
-    import shutil
+def run_claude(prompt: str, model: str = "claude-opus-4-6", timeout: int = 600) -> str:
+    """Claude CLIを呼び出してテキストを返す"""
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-    claude_path = shutil.which("claude")
-
-    result_text = ""
-
-    # Claude CLI で抽出
-    if claude_path:
-        try:
-            print("  推奨銘柄抽出中（Claude）...")
-            result = subprocess.run(
-                [claude_path, "-p", extraction_prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, env=env,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                result_text = result.stdout.strip()
-        except Exception as e:
-            print(f"  [WARN] Claude 銘柄抽出失敗: {e}")
-
-    # Gemini フォールバック
-    if not result_text:
-        try:
-            print("  推奨銘柄抽出中（Gemini フォールバック）...")
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=extraction_prompt,
-                config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=1000),
-            )
-            result_text = response.text
-        except Exception as e:
-            print(f"  [WARN] Gemini 銘柄抽出失敗: {e}")
-            return []
-
-    # JSON パース
-    try:
-        # コードブロックで囲まれている場合を処理
-        cleaned = re.sub(r'```json?\s*', '', result_text)
-        cleaned = re.sub(r'```\s*$', '', cleaned).strip()
-        # JSON配列部分を抽出
-        match = re.search(r'\[.*\]', cleaned, re.DOTALL)
-        if match:
-            stocks = json.loads(match.group())
-            # バリデーション: 必須フィールドチェック
-            validated = []
-            for s in stocks[:3]:
-                if isinstance(s, dict) and s.get("ticker") and s.get("name"):
-                    validated.append({
-                        "ticker": s["ticker"],
-                        "name": s["name"],
-                        "reason": s.get("reason", ""),
-                    })
-            print(f"  推奨銘柄抽出完了: {[s['ticker'] for s in validated]}")
-            return validated
-    except (json.JSONDecodeError, Exception) as e:
-        print(f"  [WARN] 銘柄JSON解析失敗: {e}")
-
-    return []
-
-
-def load_strategy_state() -> dict:
-    """data/strategy_state.json を読み込む（なければデフォルト値）"""
-    path = os.path.join(os.path.dirname(__file__), "..", "data", "strategy_state.json")
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def build_strategy_block(state: dict) -> str:
-    """strategy_state.json から記事執筆ヒントを生成"""
-    if not state:
+    claude_available = subprocess.run(["which", "claude"], capture_output=True).returncode == 0
+    if not claude_available:
         return ""
-    lines = ["\n【過去に読まれた記事の傾向（参考にすること）】"]
-    if state.get("top_topics"):
-        topics = "、".join(t["topic"] for t in state["top_topics"][:3])
-        lines.append(f"- スキを集めたトピック：{topics}")
-    if state.get("recommended_title_style"):
-        lines.append(f"- 効果的なタイトルパターン：{state['recommended_title_style']}")
-    if state.get("avoid_topics"):
-        avoid = "、".join(state["avoid_topics"][:2])
-        lines.append(f"- 反応が薄かったトピック（なるべく避ける）：{avoid}")
-    return "\n".join(lines) + "\n"
-
-
-def build_cta_block(recommended_stocks: list[dict] | None = None) -> str:
-    """記事末尾ブロック（現在は空文字を返す）"""
+    result = subprocess.run(
+        ["claude", "-p", prompt, "--output-format", "text", "--model", model],
+        capture_output=True, text=True, timeout=timeout, env=env,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    print(f"  [WARN] Claude CLI 失敗: {result.stderr[:200]}")
     return ""
 
 
-def build_prompt(articles: list[dict], history_summary: str = "", strategy_state: dict = None) -> str:
-    if strategy_state is None:
-        strategy_state = load_strategy_state()
-
-    news_block = "\n".join(
-        f"- [{a['source']}] {a['title']}\n  {a['summary'][:200]}\n  URL: {a['url']}"
-        for a in articles
-    )
-    history_block = (
-        f"\n【過去に書いたテーマ（重複禁止）】\n{history_summary}\n"
-        if history_summary and history_summary != "（過去記事なし）"
-        else ""
-    )
-    strategy_block = build_strategy_block(strategy_state)
-
-    return f"""あなたは「私」として書く個人投資家ブロガーです。
-以下のニュース一覧から、**最も深掘りする価値がある1つのテーマ（銘柄・マクロ・セクター）**を選び、
-note.com 向けの**わかりやすい深掘り解説記事**を一人称で書いてください。
-
-【重要】この記事は「無料公開のニュース解説」です。
-- ニュースをわかりやすく噛み砕いて解説することに徹してください
-- 「買い/売り/様子見」などの具体的な投資判断・行動結論は書かないでください
-- 「私ならこうする」「○○を買う」のような具体的アクションは書かないでください
-- 具体的な投資アクションは別途有料記事で提供するため、無料記事では解説と分析のみ
-{history_block}{strategy_block}
-【本日のニュース一覧（この中から最も深掘り価値があるテーマを1つ選ぶ）】
-{news_block}
-
-【記事構成（必ずこの順番・形式で書くこと）】
-
-## 今、何が起きているのか
-（400字程度。今このテーマが動いている背景。数字を必ず入れる。
-「この1週間で〇〇が〇%動いた」「〇〇社の決算で〇〇億円の〇〇」など具体的な事実から入る。
-難しい専門用語は噛み砕いて、初心者でもわかるように解説する）
-
----
-
-## なぜこれが重要なのか──表のニュースと裏の構造
-（600字程度。主流メディアとは異なる切り口を1つ以上含める。
-「表向きは〇〇と報じられているが、本当に注目すべきは〇〇だ」という構造。
-歴史的文脈・構造的背景・業界のインセンティブ構造などを使って深掘りする）
-
----
-
-## 数字で読む現在地
-（400字程度。具体的な数値・比率・過去比較を使って現状を整理。
-「現在のPERは〇倍で過去5年平均〇倍に対して〇%〇〇」
-「〇年〇月以来の〇〇水準」などの表現を積極的に使う）
-
----
-
-## この先、考えられる展開
-（600字程度。複数のシナリオを解説する。あくまで「こういう展開がありうる」という分析であり、
-「だから○○すべき」という行動結論は書かない。
-読者が自分で考えるための材料を提供する。
-ただし「じゃあ具体的にどう動けばいいの？」という疑問を読者に抱かせる形で終わらせること）
-
----
-
-## まとめ
-（箇条書き3行。保存して後で読み返せる密度で。
-各行に必ず数字か固有名詞を入れる。行動結論は書かず、事実と分析のみ）
-
-【執筆ルール】
-- 全体で5000字以上
-- 主語は必ず「私」。「投資家全般」「多くの人」という三人称NG
-- 口語体かつ知的。「〜なんです」「正直〜」「実は〜」「ここが重要で」など
-- 専門用語は必ず括弧で補足（初心者が読んでもわかるように）
-- 数字は徹底的に具体的に（「大幅」ではなく「+3.5%」）
-- タイムリーな数値は「〜と報じられています」「〜とされています」と表現
-- その日のニュースに関連する具体的な銘柄を2〜3個、ティッカーシンボル付きで記事中に自然に言及すること
-- AI感・テンプレ感のある表現NG。「まず〜」「次に〜」「結論として〜」の機械的構成NG
-- 絵文字NG
-- 「買うべき」「売るべき」「〇〇がおすすめ」のような投資判断は絶対に書かない
-
-【出力ルール】
-- 記事本文のみを出力すること
-- 冒頭に前置き・紹介文を絶対に入れないこと
-- 末尾に参照・ソース・出典セクションを入れないこと
-- 最初の文字は必ず「## 結論：」で始めること"""
-
-
-def run_deep_research(articles: list[dict], history_summary: str = "") -> dict:
-    """Claude CLI で記事を執筆する（Gemini フォールバック付き）"""
-    prompt = build_prompt(articles, history_summary=history_summary)
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-    import shutil
-    claude_path = shutil.which("claude")
-    claude_available = bool(claude_path)
-
-    draft = ""
-    if claude_available:
-        print("  Claude CLI で記事執筆中...")
-        result = subprocess.run(
-            [claude_path, "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, env=env,
-        )
-        stdout_text = result.stdout or ""
-        stderr_text = result.stderr or ""
-        if result.returncode == 0 and stdout_text.strip():
-            candidate = stdout_text.strip()
-            # 品質検証: 会話応答や短すぎる出力を拒否
-            reject_phrases = ["承知しています", "何か具体的な", "作業がありますか", "お手伝い", "ご指示ください"]
-            is_conversational = any(p in candidate[:200] for p in reject_phrases)
-            is_too_short = len(candidate) < 1000
-            has_heading = "##" in candidate
-            if is_conversational or (is_too_short and not has_heading):
-                print(f"  [WARN] Claude CLI が会話応答を返しました。Geminiにフォールバックします。")
-                print(f"  [WARN] 出力冒頭: {candidate[:100]}")
-            else:
-                draft = candidate
-                print(f"  Claude 執筆完了（{len(draft)} 文字）")
-        else:
-            print(f"  [WARN] Claude CLI 失敗: {stderr_text[:200]}")
-    else:
-        print("  [WARN] Claude CLI が検出されません。Geminiのみで処理します。")
-
-    if not draft:
-        print("  Gemini で執筆中（フォールバック）...")
+def run_gemini(prompt: str) -> str:
+    """Geminiフォールバック"""
+    if not GEMINI_API_KEY:
+        return ""
+    try:
+        from google import genai
+        from google.genai import types
         client = genai.Client(api_key=GEMINI_API_KEY)
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(temperature=0.7, max_output_tokens=16000),
         )
-        draft = response.text
-        print(f"  Gemini 執筆完了（{len(draft)} 文字）")
+        return response.text or ""
+    except Exception as e:
+        print(f"  [WARN] Gemini 失敗: {e}")
+        return ""
+
+
+def select_topics(articles: list[dict]) -> tuple[dict, dict]:
+    """ニュース一覧から2つの独立したトピックを選定"""
+    news_block = "\n".join(
+        f"{i+1}. [{a['source']}] {a['title']}"
+        for i, a in enumerate(articles[:20])
+    )
+    prompt = f"""以下のニュース一覧から、今日の日本の個人投資家にとって最も注目度の高い2つのトピックを選定してください。
+2つは互いに異なるテーマ（同じセクター・銘柄にならないよう）を選ぶこと。
+
+{news_block}
+
+以下のJSON形式のみで回答してください（前置き不要）：
+{{
+  "topic1": {{"index": <番号>, "title": "<ニュースタイトル>"}},
+  "topic2": {{"index": <番号>, "title": "<ニュースタイトル>"}}
+}}"""
+
+    text = run_claude(prompt, model="claude-sonnet-4-6", timeout=120)
+    if text:
+        m = re.search(r'\{[\s\S]+\}', text)
+        if m:
+            try:
+                data = json.loads(m.group(0))
+                idx1 = max(0, data["topic1"]["index"] - 1)
+                idx2 = max(0, data["topic2"]["index"] - 1)
+                return articles[idx1], articles[min(idx2, len(articles)-1)]
+            except Exception as e:
+                print(f"  [WARN] トピック選定パース失敗: {e}")
+
+    # フォールバック
+    return articles[0], articles[min(5, len(articles)-1)]
+
+
+def build_article_prompt(news: dict) -> str:
+    """記事執筆プロンプト"""
+    source = news.get('source', 'メディア')
+    title_en = news['title']
+    summary = news.get('summary', '')[:400]
+
+    return f"""note.com向けの投資解説記事を執筆してください。
+
+【このnoteのコンセプト（執筆方針として内部的に参照すること。記事本文には書かない）】
+スイング・デイトレーダーのための朝の必読ニュース。
+世界の動きが日本株にどう波及するかを毎朝解説し、情報収集で終わらせず実際の売買に活かす視点を提供する。
+
+【取り上げるニュース】
+ソース: {source}
+タイトル: {title_en}
+概要: {summary}
+
+---
+
+【出力フォーマット（必ず守ること）】
+1行目: TITLE: [選定したタイトル]
+2行目以降: 記事本文（タイトルを本文中に繰り返さない）
+最終行: TOPIC_TAGS: [タグ1],[タグ2]
+
+---
+
+【タイトル選定ルール】
+候補を3本考え、以下の基準で1本を選ぶ：
+1. 数字を含む（「〇〇円」「〇〇%」「3つの理由」など）
+2. 読者の不安または好奇心を刺激するワードを含む
+3. 30文字以内
+禁止：「〜について」「〜を解説」「〜とは」で終わるタイトル
+
+---
+
+【記事本文構成（必ずこの順番・H2/H3の使い分けで書くこと）】
+
+[リード文（100〜150字）]
+冒頭3行で読者を引き込むフック。以下のいずれかのパターンを使うこと：
+- 逆説型：「〜と思われているが、実は逆だ」
+- 数字型：「〇〇円、〇〇%――この数字が示す本当の意味とは」
+- 問い型：「あなたはこのニュースの本質を読めているか」
+
+## {source}が報じたこと
+
+「{source}によると、〜」という書き出しで始め、このニュースの概要を800〜1000字でわかりやすく解説する。
+複数の切り口がある場合は以下のように H3 で区切る：
+
+### [切り口1の見出し]
+（本文を段落で展開）
+
+### [切り口2の見出し]
+（本文を段落で展開）
+
+## [筆者の結論をそのままH2見出しにする。例：「この上昇は3ヶ月以内に反転すると考える理由」]
+
+結論をH2見出しに入れ、その根拠を1200〜1500字で展開する。
+複数の観点は H3 で区切る：
+
+### [観点1の見出し]
+### [観点2の見出し]
+
+## 行動の考え方
+
+600〜800字。断定推奨禁止。複数パターンは H3 で区切る。
+
+## このニュースで注目すべき銘柄
+
+このニュースの影響を最も受けるセクターを特定し、売買代金上位の代表銘柄を1〜2銘柄取り上げる。
+銘柄ごとに以下の形式で書く：
+
+### [銘柄名（証券コード or ティッカー）]
+
+- 本日の株価（土日の場合は「週明けの注目水準：〇〇円前後」）
+- このニュースとこの銘柄の因果関係を明確に記述する
+
+【銘柄分析の質の基準】
+「影響がありそう」という表面的な記述は禁止。
+以下の問いに答える形で分析を書くこと：
+1. 今日このニュースがこの銘柄に与える最も直接的な影響は何か？
+2. その影響は株価にどう波及するか？（需給・業績・センチメントのいずれのルートか）
+3. 短期的（当日〜1週間）に株価がどう動きやすいか、客観的なエビデンス（過去の類似相場・相関データ・空売り比率・オプションのPCRなど）を根拠として示す
+
+【分析例の水準（参考）】
+「三菱商事×原油高」の場合：「影響があります」ではなく——
+「中東情勢の長期化観測が強まれば、原油の供給制約は構造的なものとなる。三菱商事の資源セグメント利益は原油1バレルあたりの単価と相関が高く、WTIが80ドル台から90ドルに上昇した場合の増益幅は過去のIR資料から試算できる。加えて、同社の空売り比率が直近で〇%程度と低水準にあることから、買い圧力に対する需給抵抗は小さい。週明けのギャップアップ後、〇〇円〜〇〇円ゾーンが上値の節目として意識されやすい」——このレベルの具体性を目指す。
+
+この銘柄セクションの末尾に、以下の構成で有料マガジンへの誘導文を自然につなげる：
+
+---
+
+（記事の論旨に合わせた1〜2段落の誘導文。以下は構成の参考）
+
+「この銘柄に注目できたとして、それだけでは利益にならない。同じ情報を見ている参加者は無数にいる。差がつくのはエントリータイミングと損切り・利確の設計だ。」
+
+「そのための具体的な判断軸を毎週まとめているのが以下の有料マガジンだ。読み流す情報ではなく、明日の売買に使える視点だけを届けている。」
+
+{MAGAZINE_URL}
+
+（※URLは単独の行に置くこと。note の埋め込みカードとして表示される）
+
+---
+
+【トピックタグ選定】
+以下のリストから最も関連する2つを選ぶ：
+為替 / FRB / 金利 / 決算 / マクロ経済 / エネルギー / 半導体 / 日銀 / 円安 / 円高
+→ 最終行に「TOPIC_TAGS: タグ1,タグ2」の形式で出力
+
+---
+
+【執筆ルール】
+- 目標文字数：5000字程度
+- 対象読者：スイング・デイトレーダー（売買に使える視点を求めている）
+- 文体：ブロガー口調（断定的すぎず、読者と対話する感覚）
+- 個人プロフィール（投資歴〇年・〇代など）は一切記載しない
+- H2 はセクションの大見出し、H3 はセクション内の小見出しとして使い分ける
+- 改行・空行は意味のまとまりで自然に入れる（1文ごとの機械的な改行は禁止）
+- 段落は3〜5文を目安にまとめる
+- 太字は重要なキーワードのみに限定する
+- 絵文字は使用禁止（URLの前後も含めて）
+- 数字は徹底的に具体的に（「大幅」ではなく「+3.5%」）
+- タイムリーな数値は「〜と報じられています」「〜とされています」と表現
+- 「おわりに」という見出しは使わない。銘柄セクション末尾から自然に誘導文につなげる
+- 記事本文のみ出力（前置き・後記・加筆まとめ不要）"""
+
+
+def write_article(news: dict, article_num: int) -> dict:
+    """1本の記事を執筆して返す"""
+    prompt = build_article_prompt(news)
+
+    print(f"  Claude CLI で記事{article_num}執筆中...")
+    draft = run_claude(prompt, model="claude-opus-4-6", timeout=600)
+
+    if not draft:
+        print(f"  Gemini で記事{article_num}執筆中（フォールバック）...")
+        draft = run_gemini(prompt)
+
+    if not draft:
+        raise RuntimeError(f"記事{article_num}の執筆に失敗しました")
+
+    print(f"  執筆完了（{len(draft)} 文字）")
+
+    # TITLE: 抽出
+    title = ""
+    title_match = re.search(r'^TITLE:\s*(.+)$', draft, re.MULTILINE)
+    if title_match:
+        title = title_match.group(1).strip()
+        draft = re.sub(r'^TITLE:\s*.+\n?', '', draft, count=1, flags=re.MULTILINE).strip()
+
+    # TOPIC_TAGS: 抽出
+    topic_tags = []
+    tags_match = re.search(r'TOPIC_TAGS:\s*(.+)$', draft, re.MULTILINE)
+    if tags_match:
+        topic_tags = [t.strip() for t in tags_match.group(1).split(',')][:2]
+        draft = re.sub(r'TOPIC_TAGS:\s*.+$', '', draft, flags=re.MULTILINE).strip()
+
+    # 4000字未満なら各セクションを補強
+    if len(draft) < 4000:
+        print(f"  [WARN] 記事{article_num}が{len(draft)}文字（4000字未満）→ 補強中...")
+        news_title = news.get('title', '')
+        news_summary = news.get('summary', '')
+        supplement_prompt = f"""以下のニュースを題材に、投資ブログ記事を5000字程度で執筆してください。
+
+【ニュース】
+タイトル: {news_title}
+概要: {news_summary}
+
+【出力ルール】
+- 1行目: TITLE: [記事タイトル]（ニュースの核心を突いた逆説/数字/問い型の30字以内）
+- 本文: リード文 → ## [ソース名]が報じたこと → ## [結論H2] → ## 行動の考え方 → ## このニュースで注目すべき銘柄
+- 銘柄セクション末尾に有料マガジン誘導（{MAGAZINE_URL} を単独行に）
+- 末尾: TOPIC_TAGS: タグ1,タグ2（為替/FRB/金利/決算/マクロ経済/エネルギー/半導体/日銀/円安/円高 から2つ）
+- 「おわりに」「今週の注目指標」見出し禁止
+- コメント・まとめ・前置き不要"""
+        supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=300)
+        if supplement:
+            # 新たにTITLE:とTOPIC_TAGS:を抽出
+            s_title_match = re.search(r'^TITLE:\s*(.+)$', supplement, re.MULTILINE)
+            if s_title_match and not title:
+                title = s_title_match.group(1).strip()
+                supplement = re.sub(r'^TITLE:\s*.+\n?', '', supplement, count=1, flags=re.MULTILINE).strip()
+            s_tags_match = re.search(r'TOPIC_TAGS:\s*(.+)$', supplement, re.MULTILINE)
+            if s_tags_match and not topic_tags:
+                topic_tags = [t.strip() for t in s_tags_match.group(1).split(',')][:2]
+                supplement = re.sub(r'TOPIC_TAGS:\s*.+$', '', supplement, flags=re.MULTILINE).strip()
+            draft = clean_article(supplement)
+            print(f"  補強後: {len(draft)} 文字")
 
     draft = clean_article(draft)
-    recommended_stocks = extract_recommended_stocks(draft)
+
+    # タイトルが抽出できなかった場合は本文H2から取得
+    if not title:
+        first_h2 = re.search(r'^##\s+(.+)$', draft, re.MULTILINE)
+        if first_h2:
+            title = first_h2.group(1).strip()
+        else:
+            title = news['title'][:30]
+
+    all_tags = FIXED_TAGS + topic_tags
 
     return {
-        "draft": draft,
-        "articles": articles,
-        "recommended_stocks": recommended_stocks,
+        "title": title,
+        "article": draft,
+        "tags": all_tags,
+        "topic_tags": topic_tags,
+        "source_news": news,
+        "image_paths": [],
+        "cover_path": None,
     }
 
 
 def main():
-    print("=== ② Claude 記事執筆 ===")
+    print("=== ② 記事執筆（2本） ===")
 
     with open("output/collected_news.json", encoding="utf-8") as f:
         articles = json.load(f)
 
-    from article_history import load_history, build_history_summary
-    history_summary = build_history_summary(load_history())
-    result = run_deep_research(articles, history_summary=history_summary)
+    # 2トピック選定
+    print("  トピック選定中...")
+    news1, news2 = select_topics(articles)
+    print(f"  記事1トピック: {news1['title']}")
+    print(f"  記事2トピック: {news2['title']}")
 
     os.makedirs("output", exist_ok=True)
-    with open("output/draft.json", "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
 
-    print("保存: output/draft.json")
-    print("\n--- 記事冒頭 ---")
-    print(result["draft"][:300])
-    return result
+    # 記事1執筆
+    print(f"\n  --- 記事1執筆 ---")
+    article1 = write_article(news1, 1)
+    with open("output/article_1.json", "w", encoding="utf-8") as f:
+        json.dump(article1, f, ensure_ascii=False, indent=2)
+    print(f"  保存: output/article_1.json  タイトル: {article1['title']}")
+
+    # 記事2執筆
+    print(f"\n  --- 記事2執筆 ---")
+    article2 = write_article(news2, 2)
+    with open("output/article_2.json", "w", encoding="utf-8") as f:
+        json.dump(article2, f, ensure_ascii=False, indent=2)
+    print(f"  保存: output/article_2.json  タイトル: {article2['title']}")
+
+    # 後方互換: draft.json / final.json
+    with open("output/draft.json", "w", encoding="utf-8") as f:
+        json.dump({"draft": article1["article"], "articles": [news1]}, f, ensure_ascii=False, indent=2)
+    with open("output/polished.json", "w", encoding="utf-8") as f:
+        json.dump({"polished": article1["article"]}, f, ensure_ascii=False, indent=2)
+    with open("output/final.json", "w", encoding="utf-8") as f:
+        json.dump(article1, f, ensure_ascii=False, indent=2)
+
+    return {"article_1": article1, "article_2": article2}
 
 
 if __name__ == "__main__":

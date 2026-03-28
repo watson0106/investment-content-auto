@@ -21,7 +21,8 @@ from selenium.webdriver.support import expected_conditions as EC
 NOTE_EMAIL    = os.environ["NOTE_EMAIL"]
 NOTE_PASSWORD = os.environ["NOTE_PASSWORD"]
 
-NOTE_TAGS = ["投資", "米国株", "日本株", "投資情報", "マーケット", "経済", "株式投資", "AI分析"]
+# デフォルトタグ（固定5つ）。記事ごとのtopic_tagsが加わり計7つになる。
+NOTE_TAGS_DEFAULT = ["投資", "株式投資", "資産運用", "米国株", "日本株"]
 
 _IS_CI = bool(os.environ.get("GITHUB_ACTIONS"))
 
@@ -263,12 +264,51 @@ def clean_inline_markdown(text: str) -> str:
     return text
 
 
+def insert_url_as_embed(driver, url: str):
+    """URLをnoteの埋め込みカードとして挿入（ペーストイベント経由）"""
+    # クリップボードAPIでURLをセットしてペーストイベントを発火
+    driver.execute_script("""
+        const url = arguments[0];
+        const dt = new DataTransfer();
+        dt.setData('text/plain', url);
+        const ev = new ClipboardEvent('paste', {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: dt,
+        });
+        document.activeElement.dispatchEvent(ev);
+    """, url)
+    time.sleep(2.0)  # 埋め込みポップアップの出現を待つ
+    # 「埋め込む」ボタンが出たらクリック
+    try:
+        from selenium.webdriver.common.by import By
+        embed_btn = driver.find_element(
+            By.XPATH,
+            "//button[contains(text(),'埋め込む') or contains(@aria-label,'埋め込')]"
+        )
+        embed_btn.click()
+        time.sleep(1.5)
+        return
+    except Exception:
+        pass
+    # フォールバック: プレーンテキストで挿入
+    driver.execute_script(
+        "document.execCommand('insertText', false, arguments[0])", url + '\n'
+    )
+
+
 def insert_section_with_headings(driver, section_text: str):
-    """セクションテキストを挿入（##見出し行はh2書式を適用）"""
+    """セクションテキストを挿入（## → h2、### → h3、URL単独行 → 埋め込み）"""
+    # 3連続以上の改行を2連続に圧縮してスペース過多を防ぐ
+    section_text = re.sub(r'\n{3,}', '\n\n', section_text)
     lines = section_text.split('\n')
     batch: list[str] = []
+    skip_leading_blanks = False  # 見出し直後の空行をスキップするフラグ
 
     def flush_batch():
+        # 末尾の空行を除去してスペースが大量に入るのを防ぐ
+        while batch and not batch[-1].strip():
+            batch.pop()
         if not batch:
             return
         driver.execute_script(
@@ -278,21 +318,34 @@ def insert_section_with_headings(driver, section_text: str):
         batch.clear()
 
     for line in lines:
-        m = re.match(r'^#{1,3}\s+(.*)', line)
+        # ## または ### の見出し行
+        m = re.match(r'^(#{2,3})\s+(.*)', line)
         if m:
             flush_batch()
-            heading_text = clean_inline_markdown(m.group(1).strip())
-            # 見出しテキストを挿入 → h2書式を適用 → 改行して通常テキストに戻す
+            level = len(m.group(1))  # 2 → h2、3 → h3
+            heading_tag = 'h2' if level == 2 else 'h3'
+            heading_text = clean_inline_markdown(m.group(2).strip())
+            # 見出しテキストを挿入 → 書式を適用 → 改行して通常テキストに戻す
             driver.execute_script(
                 "document.execCommand('insertText', false, arguments[0])", heading_text
             )
             time.sleep(0.1)
-            driver.execute_script("document.execCommand('formatBlock', false, 'h2')")
+            driver.execute_script(f"document.execCommand('formatBlock', false, '{heading_tag}')")
             time.sleep(0.1)
             driver.execute_script("document.execCommand('insertText', false, '\\n')")
             driver.execute_script("document.execCommand('formatBlock', false, 'p')")
             time.sleep(0.1)
+            skip_leading_blanks = True  # 見出し直後の空行をスキップ
+        # URL単独行 → 埋め込みカード
+        elif re.match(r'^https?://\S+$', line.strip()):
+            flush_batch()
+            insert_url_as_embed(driver, line.strip())
+            skip_leading_blanks = False
         else:
+            # 見出し直後の空行はスキップ（スペース過多を防ぐ）
+            if skip_leading_blanks and not line.strip():
+                continue
+            skip_leading_blanks = False
             batch.append(clean_inline_markdown(line))
 
     flush_batch()
@@ -701,24 +754,26 @@ def update_article_body(note_key: str, append_text: str, headless: bool = True) 
         driver.quit()
 
 
-def main():
-    print("=== ⑥ note.com 自動投稿 ===")
+def main(article_file: str = "output/final.json"):
+    print(f"=== ⑥ note.com 下書き保存 ({article_file}) ===")
 
-    with open("output/final.json", encoding="utf-8") as f:
+    with open(article_file, encoding="utf-8") as f:
         data = json.load(f)
 
     title       = data["title"]
     body        = data["article"]
     image_paths = data.get("image_paths", [])
     cover_path  = data.get("cover_path")
+    # 記事ごとのタグ（固定5 + トピック2 = 計7）
+    tags = data.get("tags", NOTE_TAGS_DEFAULT)
 
     print(f"  タイトル: {title}")
     print(f"  本文: {len(body)} 文字")
-    print(f"  本文画像: {len(image_paths)} 枚")
+    print(f"  タグ: {tags}")
     print(f"  カバー画像: {cover_path or '固定'}")
 
     headless = os.environ.get("HEADLESS", "true").lower() == "true"
-    url = post_article(title, body, image_paths, NOTE_TAGS, headless=headless, cover_path=cover_path)
+    url = post_article(title, body, image_paths, tags, headless=headless, cover_path=cover_path)
 
     result = {
         "url":   url,
@@ -726,7 +781,10 @@ def main():
         "status": "success" if url else "failed",
     }
 
+    # 投稿済みログに追記
+    import datetime
     out_path = "output/posted.json"
+    result["saved_at"] = datetime.datetime.now().isoformat()
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 

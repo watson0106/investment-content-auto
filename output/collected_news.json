@@ -1,82 +1,72 @@
 [
   {
-    "source": "CNBC Top News",
-    "title": "The Fed issues its latest interest rate decision Wednesday. Here's what to expect",
-    "summary": "The Federal Reserve has little choice but to stay on the sidelines this week.",
-    "url": "https://www.cnbc.com/2026/03/17/the-fed-issues-its-latest-interest-rate-decision-wednesday-heres-what-to-expect.html",
-    "published": "2026-03-18T05:29:55+09:00",
-    "score": 4.5
+    "source": "Bloomberg Markets",
+    "title": "Vanguard's Wrzesniewsky: Credit Holding on Pretty Well",
+    "summary": "Vanguard Head of Fixed Income Client Portfolio Management Matt Wrzesniewsky discusses bonds losing more than $2 trillion as the war in Iran continues to cause ripples through markets. He talks with Katie Greifeld and Romaine Bostick on “The Close.” (Source: Bloomberg)",
+    "url": "https://www.bloomberg.com/news/videos/2026-03-25/vanguard-s-wrzesniewsky-credit-holding-on-pretty-well-video",
+    "published": "2026-03-26T07:29:03+09:00"
   },
   {
-    "source": "CNBC Top News",
-    "title": "Airlines raise revenue guidance despite rising fuel costs, citing growth in demand",
-    "summary": "CEO Ed Bastian told CNBC's Phil LeBeau that Delta had taken a $400 million fuel hit in the quarter, but that demand has been \"really, really great.\"",
-    "url": "https://www.cnbc.com/2026/03/17/airline-guidance-iran-war-oil.html",
-    "published": "2026-03-18T05:00:39+09:00",
-    "score": 4.5
+    "source": "Bloomberg Technology",
+    "title": "Prologis CEO Sees Prolonged AI, Data Center Tailwinds",
+    "summary": "Prologis CEO Dan Letter joins Bloomberg Businessweek Daily to discuss the state of global logistics and shipping as geopolitics and associated risk impacts the firm's customer base. However, Prologis is optimistic about its data center business. Letter says the company's strong relationship with hyperscalers is ongoing, bolstering \"a fortress of a balance sheet\" as Prologis continues to secure longer-term power capacity. Letter speaks with Carol Massar and Tim Stenovec. (Source: Bloomberg)",
+    "url": "https://www.bloomberg.com/news/videos/2026-03-25/prologis-ceo-sees-prolonged-ai-data-center-tailwinds-video",
+    "published": "2026-03-26T06:57:44+09:00"
+  },
+  {
+    "source": "Nikkei Asia",
+    "title": "Japan's closest garrison to Taiwan takes bigger role 10 years on",
+    "summary": "",
+    "url": "https://asia.nikkei.com/politics/defense/japan-s-closest-garrison-to-taiwan-takes-bigger-role-10-years-on",
+    "published": ""
+  },
+  {
+    "source": "Yahoo Finance",
+    "title": "Market Digest: ADM, OGE",
+    "summary": "",
+    "url": "https://finance.yahoo.com/research/reports/ARGUS_46533_MarketSummary_1774436223000?yptr=yahoo&ncid=yahooproperties_plusresear_nm5q6ze1cei",
+    "published": "2026-03-25T19:57:03+09:00"
+  },
+  {
+    "source": "Yahoo Finance Japan",
+    "title": "ソニー・ホンダ AFEELA開発中止",
+    "summary": "",
+    "url": "https://news.yahoo.co.jp/pickup/6574193?source=rss",
+    "published": "2026-03-25T18:44:26+09:00"
+  },
+  {
+    "source": "Yahoo Japan トップ",
+    "title": "米中首脳会談 5月14日・15日に",
+    "summary": "",
+    "url": "https://news.yahoo.co.jp/pickup/6574229?source=rss",
+    "published": "2026-03-26T06:37:52+09:00"
+  },
+  {
+    "source": "CNBC",
+    "title": "Iran has no intention to hold talks with U.S; foreign minister says Trump proposal to end war being reviewed",
+    "summary": "President Donald Trump has claimed the U.S. and Iran are \"in negotiations now.\" But the Islamic Republic denies any direct talks to end the war.",
+    "url": "https://www.cnbc.com/2026/03/25/iran-war-us-trump.html",
+    "published": "2026-03-26T05:49:26+09:00"
   },
   {
     "source": "MarketWatch",
-    "title": "Lilly gets rare downgrade as analysts question hype over GLP-1 pills and Zepbound’s cash sales",
-    "summary": "If middle-class Americans lose their jobs to AI, that could mean fewer cash sales of weight-loss drugs like Zepbound.",
-    "url": "https://www.marketwatch.com/story/lilly-gets-rare-downgrade-as-analysts-question-hype-over-glp-1-pills-and-zepbounds-cash-sales-60b231f4?mod=mw_rss_topstories",
-    "published": "2026-03-18T03:28:00+09:00",
-    "score": 4.0
+    "title": "McDonald’s could make $100 million in just the first few days of selling ‘KPop Demon Hunters’ meals",
+    "summary": "Restaurant analyst says the tie-in with the Netflix film will be a huge hit for the Golden Arches",
+    "url": "https://www.marketwatch.com/story/gonna-be-golden-these-kpop-demon-hunters-meals-could-make-mcdonalds-100-million-in-just-the-first-few-days-d0fc1fe2?mod=mw_rss_topstories",
+    "published": "2026-03-26T07:46:00+09:00"
   },
   {
-    "source": "CNBC Top News",
-    "title": "Lululemon reports weak guidance as proxy battle, tariffs weigh on bottom line",
-    "summary": "Lululemon topped fourth-quarter estimates but gave weaker-than-expected sales and earnings forecasts for 2026.",
-    "url": "https://www.cnbc.com/2026/03/17/lululemon-lulu-earnings-q4-2025.html",
-    "published": "2026-03-18T05:48:12+09:00",
-    "score": 4.0
+    "source": "NHK 経済",
+    "title": "イギリスBBC 新会長にグーグルの元幹部を任命",
+    "summary": "イギリスの公共放送BBCは、アメリカのトランプ大統領に関するドキュメンタリー番組への批判を受けて辞任を表明していた会長に代わり、IT大手グーグルの元幹部を新しい会長に任命したと発表しました。",
+    "url": "https://news.web.nhk/newsweb/na/na-k10015084351000",
+    "published": "2026-03-26T07:34:20+09:00"
   },
   {
-    "source": "Bloomberg Markets",
-    "title": "AI Drone Software Stock Jumps 700% in Best IPO Since Newsmax",
-    "summary": "Swarmer Inc. shares skyrocketed 700% on Tuesday, putting the artificial intelligence drone software maker on pace for the best trading debut by a US stock since Newsmax Inc.’s blockbuster entry nearly a year ago.",
-    "url": "https://www.bloomberg.com/news/articles/2026-03-17/ai-drone-software-stock-jumps-700-in-best-ipo-since-newsmax",
-    "published": "2026-03-18T04:20:02+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "Exxon Mobil: Avoid Being The Latecomer To The Energy Party (Downgrade)",
+    "source": "ロイター",
+    "title": "米メタとグーグルに損害賠償評決、未成年者ＳＮＳ依存巡り責任認定",
     "summary": "",
-    "url": "https://seekingalpha.com/article/4883329-exxon-mobil-avoid-being-latecomer-to-energy-party-downgrade?source=feed_all_articles",
-    "published": "2026-03-18T05:45:47+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "EOG Resources: Near-Term Boost From The Iran Conflict, But Fundamental Risks Are Rising (Rating Downgrade)",
-    "summary": "",
-    "url": "https://seekingalpha.com/article/4883315-eog-resources-near-term-boost-from-iran-conflict-fundamental-risks-are-rising?source=feed_all_articles",
-    "published": "2026-03-18T05:06:10+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "Monetary Policy Rules Suggest Fed Should Hold Steady In March",
-    "summary": "",
-    "url": "https://seekingalpha.com/article/4883328-monetary-policy-rules-suggest-fed-should-hold-steady-in-march?source=feed_all_articles",
-    "published": "2026-03-18T05:05:00+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "Sable Offshore Stock: The Surge Offers A Great Exit Point (Downgrade)",
-    "summary": "",
-    "url": "https://seekingalpha.com/article/4883314-sable-offshore-stock-surge-offers-great-exit-point-downgrade?source=feed_all_articles",
-    "published": "2026-03-18T05:02:57+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "CNBC Top News",
-    "title": "U.S. says it may be forced to shut down some airports over funding standoff",
-    "summary": "The partial government shutdown has forced 50,000 Transportation Security Administration airport security officers to work without pay for the last month.",
-    "url": "https://www.cnbc.com/2026/03/17/airlines-tsa-dhs-shutdown-travel.html",
-    "published": "2026-03-18T01:05:34+09:00",
-    "score": 3.0
+    "url": "https://jp.reuters.com/world/us/3TGUNOH3VJMNXPK4CWGMFMRIE4-2026-03-25/",
+    "published": ""
   }
 ]

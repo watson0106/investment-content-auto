@@ -249,3 +249,1596 @@ Exception: ログイン失敗。メール・パスワードを確認してくだ
   API login failed (status=403), フォームで試みる...
 
 ❌ ⑥ note 投稿 でエラー発生:
+========================================
+実行開始: 2026-03-19 07:00:04
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 2 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: note トレンド
+  note: 20 件取得
+  取得合計: 193 件
+  重複除去後: 181 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] Bair: Fed Keeping 'Dry Powder' as Inflation Persists
+  2. [Bloomberg Technology] Micron Boosts Factory Spending in Bid to Keep Up With Demand
+  3. [Nikkei Asia] Bandai Namco's sales from 'Gundam' franchise nearing $1.7bn targe
+  4. [Yahoo Finance] Analyst Report: S&P Global Inc
+  5. [Yahoo Finance Japan] 米FRB 政策金利の据え置きを決定
+  6. [CNBC] Micron revenue almost triples, tops estimates as demand for memor
+  7. [MarketWatch] Dow falls nearly 800 points after Powell makes one thing clear: T
+  8. [ロイター] ウニクレディトＣＥＯ、コメルツ銀への提案条件改善を排除せず
+  9. [日経新聞] スピンオフ税制優遇に「新事業」要件廃止　4月、レゾナックが申請
+  10. [note] 投資戦略
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（7113 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+# 今日のポイント
+*   FRB、政策金利据え置き決定。インフレ警戒続く
+*   パウエル議長、利下げに慎重姿勢で市場動揺
+*   Micron好決算、半導体需要の力強い拡大示す
+
+---
+
+## ニュース① 米FRB、政策金利据え置き決定と続くインフレ警戒
+
+### どんなニュース？
+本日、米連邦準備制度理事会（FRB）は、金融政策の要である政策金利を現在の水準に据え置くことを決定しました。これは市場の多くのエコノミストや投資家の予想通りの動きだったんです。FRBは、インフレ（物価上昇）が目標とする2%に向けて持続的に減速していることを確認するまで、利下げには慎重な姿勢を崩さない方針を示し
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Gemini で添削・肉付け中...
+  添削完了（13149 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+はい、皆さんこんにちは！プロ投資家兼ブロガーの〇〇（←ここにブログ名や個人名が入るイメージですね）です。投資歴20年以上、市場の荒波を乗り越えてきた私の視点から、今日のホットなニュースを深掘りしていきましょう。
+
+今日の市場は、まるで綱引きのようでしたね。FRBの金融政策という「重し」と、半導体セクターの「力強い追い風」がぶつかり合う一日。この複雑な状況をどう読み解き、どう投資に活かすか、一緒に考えていきましょう。
+
+---
+
+# 今日のポイント
+
+*   FRB、政策金利据え置き決定。インフレ警戒続く
+*   パウエル議長、利下げに慎重姿勢で市場動揺
+*   Micron好決算、半導体需要の
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 画像生成（カバー画像＋本文図表） ===
+  カバー画像生成中...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (827KB)
+  カバー画像: output/images/cover.png
+  図表箇所を特定中（Geminiが枚数を判断）...
+  3 箇所の図表を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ一覧 (table)
+    [3] 市場動向の推移 (line_chart)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (466KB)
+  [2/3] 主要データ一覧 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (511KB)
+  [3/3] 市場動向の推移 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (431KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  タイトル固定: 新聞よりわかりやすくて早い今日の投資ニュース速報
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: 新聞よりわかりやすくて早い今日の投資ニュース速報
+  本文: 13188 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+  note にログイン中...
+  ログイン成功（API）
+  エディタを開いています...
+  エディタURL: https://editor.note.com/notes/n69064aa01f54/edit/
+  タイトル入力中...
+  カバー画像を設定中...
+  本文入力中（13188 文字）...
+  [1/3] 画像をペースト中: chart_0.png
+    ✓ 画像1 挿入完了
+  [2/3] 画像をペースト中: chart_1.png
+    ✓ 画像2 挿入完了
+  [3/3] 画像をペースト中: chart_2.png
+    ✓ 画像3 挿入完了
+  下書き保存中...
+  「下書き保存」クリック完了
+  下書き保存完了: https://note.com/kawasewatson0106/n/n69064aa01f54
+
+✅ 下書き保存成功: https://note.com/kawasewatson0106/n/n69064aa01f54
+
+==================================================
+✅ パイプライン完了
+==================================================
+投稿URL: https://note.com/kawasewatson0106/n/n69064aa01f54
+
+── 記事履歴を更新中...
+  履歴保存: 2026-03-19 | 
+終了コード: 0
+実行終了: 2026-03-19 07:04:23
+========================================
+実行開始: 2026-03-20 07:00:04
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 3 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: note トレンド
+  note: 20 件取得
+  取得合計: 194 件
+  重複除去後: 183 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] New York Knicks Legend John Starks on March Madness
+  2. [Bloomberg Technology] Kalshi Gets $1 Billion in New $22 Billion Funding Round
+  3. [Nikkei Asia] Trump presses Takaichi on Hormuz security, says Japan 'unlike NAT
+  4. [Yahoo Finance] Analyst Report: Williams-Sonoma Inc
+  5. [Yahoo Finance Japan] メガソーラーの導入支援終了へ
+  6. [CNBC] Copper joins gold in broad commodities sell-off. There's a worryi
+  7. [MarketWatch] Betting scandals leave pro sports just one way to save the $165 b
+  8. [ロイター] 高市首相、ホルムズへの艦船派遣巡り日本の立場説明　トランプ氏との会談で
+  9. [日経新聞] ビットコインに「春の足音」　イラン開戦以降は一人勝ち、一段高へ素地
+  10. [note] 投資戦略
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（8693 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+## 今日のポイント
+
+*   **トランプ氏発言：** ホルムズ海峡の安全保障巡り、日本の防衛費増額と原油価格上昇に警戒。
+*   **コモディティ下落：** 銅と金が下落。インフレと景気減速の「スタグフレーション」懸念が浮上。
+*   **Kalshi巨額調達：** 予測市場のフィンテック企業が220億ドル評価。新金融の波と未公開株市場の熱狂。
+
+---
+
+## ニュース① トランプ氏のホルムズ海峡発言、日本の安全保障と経済への波紋
+
+### どんなニュース？
+実は先日、アメリカのドナルド・トランプ前大統領が高市早苗（たかいちさなえ）氏と会談した際、ホルムズ海峡の安全保障について日本に言及
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Gemini で添削・肉付け中...
+  添削完了（16856 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## 今日のポイント：プロ投資家が読み解く、市場を揺るがす3つの波
+
+皆さん、こんにちは！投資歴20年以上のプロ投資家、そして人気ブロガーの〇〇（※筆者名）です。
+
+今日の市場は、まるで嵐の前の静けさ、あるいはすでに嵐の中にいるような、複雑な様相を呈していますね。地政学リスク、マクロ経済の不穏な兆候、そして未来の金融の萌芽――これら3つの大きな波が、私たちの投資環境に大きな影響を与えようとしています。
+
+今日は、AIが生成したドラフトをベースに、プロ投資家の視点からこれらのニュースを深掘りし、皆さんの投資戦略に役立つヒントをお届けしたいと思います。表面的な情報だけでは見えない、その裏側にある構
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 画像生成（カバー画像＋本文図表） ===
+  カバー画像生成中...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (905KB)
+  カバー画像: output/images/cover.png
+  図表箇所を特定中（Geminiが枚数を判断）...
+  3 箇所の図表を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ一覧 (table)
+    [3] 市場動向の推移 (line_chart)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (532KB)
+  [2/3] 主要データ一覧 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (689KB)
+  [3/3] 市場動向の推移 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (574KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  タイトル固定: 新聞よりわかりやすくて早い今日の投資ニュース速報
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: 新聞よりわかりやすくて早い今日の投資ニュース速報
+  本文: 16895 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+  note にログイン中...
+  ログイン成功（API）
+  エディタを開いています...
+  エディタURL: https://editor.note.com/notes/n074f01e585ac/edit/
+  タイトル入力中...
+  カバー画像を設定中...
+  本文入力中（16895 文字）...
+  [1/3] 画像をペースト中: chart_1.png
+    ✓ 画像1 挿入完了
+  [2/3] 画像をペースト中: chart_0.png
+    ✓ 画像2 挿入完了
+  [3/3] 画像をペースト中: chart_2.png
+    ✓ 画像3 挿入完了
+  下書き保存中...
+  「下書き保存」クリック完了
+  下書き保存完了: https://note.com/kawasewatson0106/n/n074f01e585ac
+
+✅ 下書き保存成功: https://note.com/kawasewatson0106/n/n074f01e585ac
+
+==================================================
+✅ パイプライン完了
+==================================================
+投稿URL: https://note.com/kawasewatson0106/n/n074f01e585ac
+
+── 記事履歴を更新中...
+  履歴保存: 2026-03-20 | 
+終了コード: 0
+実行終了: 2026-03-20 07:04:35
+========================================
+実行開始: 2026-03-21 07:00:05
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 4 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: note トレンド
+  note: 20 件取得
+  取得合計: 195 件
+  重複除去後: 183 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] Oil Eases From 2022 High as Trump Mulls ‘Winding Down’ in Iran
+  2. [Bloomberg Technology] SoftBank’s Son Says Ohio Data Center to Be $500 Billion Project
+  3. [Nikkei Asia] Singapore's costly car culture roars on as Porsche, BYD pile in
+  4. [Yahoo Finance] Analyst Report: LyondellBasell Industries NV
+  5. [Yahoo Finance Japan] 原油高 3連休のレジャーに異変
+  6. [CNBC] Stocks tumble Friday as losses mount from Iran war impact, Dow an
+  7. [MarketWatch] ‘Six figures are missing’: My aunt’s attorney took over her bank 
+  8. [ロイター] ユニリーバの食品事業、米マコーミックが買収提案
+  9. [日経新聞] 米欧の原油、価格差11年ぶり大きさ　イランから遠い米国産に熱視線
+  10. [note] 投資戦略
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（7005 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+## 今日のポイント
+*   原油価格は高値から反落も、地政学リスクと米欧価格差に注目。
+*   ソフトバンク孫氏、オハイオに75兆円規模の巨大AIデータセンター構想を発表。
+*   イラン情勢緊迫化を受け、米国株は調整局面入り寸前まで下落。
+
+---
+
+## ニュース① 原油価格、2022年以来の高値から反落！イラン情勢と米欧価格差の深層
+
+### どんなニュース？
+本日、世界の原油価格は、2022年半ば以来の高値圏から少し落ち着きを見せました。これは、アメリカのトランプ大統領が、イランに対する軍事行動の「縮小」を検討していると発言したことが背景にあるんです。数週間にわたるイランとの対立が、
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Gemini で添削・肉付け中...
+  添削完了（15334 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+こんにちは！投資歴20年超のプロ投資家、そして個人投資家向けブロガーの〇〇（←ここにブログ名やハンドルネームが入るイメージ）です。
+
+今日の市場は、まさに「嵐の前の静けさ」と「未来への胎動」が入り混じる、非常に興味深い一日となりましたね。地政学リスクが市場を揺さぶる一方で、AIという巨大な波が新たな投資機会を生み出そうとしています。
+
+今日の記事では、AIが生成したドラフトをベースに、プロの視点から「なぜ今これが起きているのか」「今後どうなるのか」、そして「私たちはどう投資に活かすべきか」を深掘りしていきます。
+
+さあ、一緒に未来の投資地図を読み解いていきましょう！
+
+---
+
+## 今日のポ
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 画像生成（カバー画像＋本文図表） ===
+  カバー画像生成中...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (961KB)
+  カバー画像: output/images/cover.png
+  図表箇所を特定中（Geminiが枚数を判断）...
+  3 箇所の図表を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ一覧 (table)
+    [3] 市場動向の推移 (line_chart)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (321KB)
+  [2/3] 主要データ一覧 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (652KB)
+  [3/3] 市場動向の推移 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (446KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  タイトル固定: 新聞よりわかりやすくて早い今日の投資ニュース速報
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: 新聞よりわかりやすくて早い今日の投資ニュース速報
+  本文: 15373 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+  note にログイン中...
+  ログイン成功（API）
+  エディタを開いています...
+  エディタURL: https://editor.note.com/notes/n81fc00b7da29/edit/
+  タイトル入力中...
+  カバー画像を設定中...
+  本文入力中（15373 文字）...
+  [1/3] 画像をペースト中: chart_2.png
+    ✓ 画像1 挿入完了
+  [2/3] 画像をペースト中: chart_0.png
+    ✓ 画像2 挿入完了
+  [3/3] 画像をペースト中: chart_1.png
+    ✓ 画像3 挿入完了
+  下書き保存中...
+  「下書き保存」クリック完了
+  下書き保存完了: https://note.com/kawasewatson0106/n/n81fc00b7da29
+
+✅ 下書き保存成功: https://note.com/kawasewatson0106/n/n81fc00b7da29
+
+==================================================
+✅ パイプライン完了
+==================================================
+投稿URL: https://note.com/kawasewatson0106/n/n81fc00b7da29
+
+── 記事履歴を更新中...
+  履歴保存: 2026-03-21 | 
+終了コード: 0
+実行終了: 2026-03-21 07:04:39
+========================================
+実行開始: 2026-03-22 07:00:05
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+Traceback (most recent call last):
+  File "/Users/watson/investment-content-auto/src/main.py", line 45, in run_pipeline
+    func()
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 334, in main
+    url = post_article(title, body, image_paths, NOTE_TAGS, headless=headless, cover_path=cover_path)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 191, in post_article
+    login(driver, wait)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 60, in login
+    driver.get("https://note.com/login")
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 665, in get
+    return super().get(url)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 483, in get
+    self.execute(Command.GET, {"url": url})
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.NoSuchWindowException: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=146.0.7680.153)
+Stacktrace:
+0   undetected_chromedriver             0x0000000100835ed8 undetected_chromedriver + 6758104
+1   undetected_chromedriver             0x000000010082d67a undetected_chromedriver + 6723194
+2   undetected_chromedriver             0x0000000100232975 undetected_chromedriver + 452981
+3   undetected_chromedriver             0x0000000100205dd8 undetected_chromedriver + 269784
+4   undetected_chromedriver             0x00000001002b4dd8 undetected_chromedriver + 986584
+5   undetected_chromedriver             0x00000001002ceaf5 undetected_chromedriver + 1092341
+6   undetected_chromedriver             0x00000001002794e1 undetected_chromedriver + 742625
+7   undetected_chromedriver             0x000000010027a2e1 undetected_chromedriver + 746209
+8   undetected_chromedriver             0x00000001007ee3ec undetected_chromedriver + 6464492
+9   undetected_chromedriver             0x00000001007f27be undetected_chromedriver + 6481854
+10  undetected_chromedriver             0x00000001007ce46d undetected_chromedriver + 6333549
+11  undetected_chromedriver             0x00000001007f3228 undetected_chromedriver + 6484520
+12  undetected_chromedriver             0x00000001007bd7b0 undetected_chromedriver + 6264752
+13  undetected_chromedriver             0x0000000100819e78 undetected_chromedriver + 6643320
+14  undetected_chromedriver             0x000000010081a032 undetected_chromedriver + 6643762
+15  undetected_chromedriver             0x000000010082d281 undetected_chromedriver + 6722177
+16  libsystem_pthread.dylib             0x00007ff8045aee59 _pthread_start + 115
+17  libsystem_pthread.dylib             0x00007ff8045aa857 thread_start + 15
+
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 5 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: note トレンド
+  note: 20 件取得
+  取得合計: 189 件
+  重複除去後: 166 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] Shockwave of War Is Rippling Through the Global Economy
+  2. [Bloomberg Technology] Pentagon to Push AI Battlefield Integration With Focus on Maven
+  3. [Nikkei Asia] The fixer: SoftBank CEO Son guides Japan's US investments
+  4. [Yahoo Finance] Better Semiconductor Stock: Broadcom vs. Marvell Technology
+  5. [Yahoo Finance Japan] 米 イラン産原油の販売を一時容認
+  6. [CNBC] OpenClaw's ChatGPT moment sparks concern that AI models are becom
+  7. [MarketWatch] ‘I’m completely gobsmacked’: My elderly brother has a reverse mor
+  8. [ロイター] 焦点：「脳腐らせる」自覚もくぎ付け、英10代のＳＮＳ事情　専門家も規制の効果疑問視
+  9. [日経新聞] 中東混乱長期化の見方　原油高で金利に上昇圧力
+  10. [note] 投資戦略
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（8557 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+## 今日のポイント
+*   中東紛争が世界経済に広範な衝撃波をもたらす懸念。
+*   中東情勢の長期化で原油高が続き、金利に上昇圧力。
+*   AIモデルのコモディティ化が加速、投資戦略の転換点に。
+
+---
+
+## ニュース① 中東紛争の衝撃波、世界経済の新たな試練
+
+### どんなニュース？
+中東地域で紛争が勃発し、その経済的な影響が世界中で懸念されているというニュースなんです。特に、米国やユーロ圏といった主要経済圏でこれから発表されるビジネス調査（PMI（購買担当者景気指数）など）が、この紛争が世界経済にどれほどの打撃を与えているのかを測る最初の「集団健康診断」になると報じられています
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Gemini で添削・肉付け中...
+  添削完了（14845 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## 今日のポイント
+
+皆さん、こんにちは！プロ投資家のケンです。投資歴20年以上の私が、今日の市場を動かす重要なポイントをズバリ解説していきますね。
+
+今日のマーケットを語る上で外せないのが、この3つのテーマなんです。
+
+*   **中東紛争の衝撃波が世界経済を揺るがす懸念**：地政学リスクが、私たちのポートフォリオにどんな影響を与えるのか、しっかり見ていきましょう。
+*   **中東情勢の長期化で原油高が続く、金利上昇圧力の行方**：インフレ再燃と利下げ期待の後退。これは本当に大きな話ですよ。
+*   **AIモデルのコモディティ化が加速、投資戦略の転換点に**：AI投資の「次のフェーズ」
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 画像生成（カバー画像＋本文図表） ===
+  カバー画像生成中...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (892KB)
+  カバー画像: output/images/cover.png
+  図表箇所を特定中（Geminiが枚数を判断）...
+  3 箇所の図表を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ一覧 (table)
+    [3] 市場動向の推移 (line_chart)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (446KB)
+  [2/3] 主要データ一覧 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (613KB)
+  [3/3] 市場動向の推移 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (538KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  タイトル固定: 新聞よりわかりやすくて早い今日の投資ニュース速報
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: 新聞よりわかりやすくて早い今日の投資ニュース速報
+  本文: 14884 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+  note にログイン中...
+
+❌ ⑥ note 投稿 でエラー発生:
+========================================
+実行開始: 2026-03-23 07:00:05
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 5 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: note トレンド
+  note: 20 件取得
+  取得合計: 191 件
+  重複除去後: 181 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] Poste Launches €10.8 Billion Offer to Delist Telecom Italia
+  2. [Bloomberg Technology] Bitcoin Drops Below $69,000 as War Fears Weigh on Crypto Markets
+  3. [Nikkei Asia] War in the Middle East exposes high-flying Seoul stock market's v
+  4. [Yahoo Finance] Oil Is Above $100 a Barrel for the First Time Since 2022. Here's 
+  5. [Yahoo Finance Japan] 柏崎刈羽6号機 発電・送電を再開
+  6. [CNBC] The economy has a Strait of Hormuz deadline for Trump: Two weeks
+  7. [MarketWatch] Stocks are teetering on the edge of correction territory. Why the
+  8. [ロイター] 中国首相、フォーラムで一段の経済開放約束　日本企業の出席者なし
+  9. [日経新聞] 日銀「タカ派」のお株奪う欧米中銀　植田氏の円安けん制はや息切れか
+  10. [note] 投資戦略
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（9909 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+## 今日のポイント
+*   原油価格が急騰し、中東情勢が世界経済に暗雲を投げかけています。
+*   日銀の金融政策と他国との金利差が、円安を加速させています。
+*   中国の経済開放姿勢と日本企業の動向に注目が集まっています。
+
+---
+
+## ニュース① 原油高騰で世界経済に「赤信号」？中東緊迫化がインフレと株式市場を揺るがすワケ
+
+### どんなニュース？
+中東情勢の緊迫化を受け、原油価格が一時1バレルあたり100ドルを突破したというニュースです。これは2022年以来の高値水準で、特にイスラエルとイランの対立激化が懸念されており、原油輸送の要衝であるホルムズ海峡の閉鎖リスクが意識されてい
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Gemini で添削・肉付け中...
+  添削完了（15854 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## 今日のポイント
+*   原油価格が急騰し、中東情勢が世界経済に暗雲を投げかけています。インフレ再燃と景気減速、そしてAI産業への影響にも注目です。
+*   日銀の金融政策と他国との金利差が、円安を加速させています。私たちの暮らしと投資戦略にどう影響するのか、深掘りします。
+*   中国の経済開放姿勢が示されましたが、日本企業の慎重姿勢が浮き彫りになっています。チャイナリスクと新たな投資機会について考えます。
+
+---
+
+## ニュース① 原油高騰で世界経済に「赤信号」？中東緊迫化がインフレと株式市場を揺るがすワケ
+
+### どんなニュース？
+皆さん、最近の原油価格の動き、気になっています
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 画像生成（カバー画像＋本文図表） ===
+  カバー画像生成中...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (970KB)
+  カバー画像: output/images/cover.png
+  図表箇所を特定中（Geminiが枚数を判断）...
+  3 箇所の図表を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ一覧 (table)
+    [3] 市場動向の推移 (line_chart)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (384KB)
+  [2/3] 主要データ一覧 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (574KB)
+  [3/3] 市場動向の推移 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (434KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  タイトル固定: 新聞よりわかりやすくて早い今日の投資ニュース速報
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: 新聞よりわかりやすくて早い今日の投資ニュース速報
+  本文: 15893 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+  note にログイン中...
+  ログイン成功（API）
+  エディタを開いています...
+  エディタURL: https://editor.note.com/notes/ne2b0feacbacb/edit/
+  タイトル入力中...
+  カバー画像を設定中...
+  本文入力中（15893 文字）...
+  [1/3] 画像をペースト中: chart_0.png
+    ✓ 画像1 挿入完了
+  [2/3] 画像をペースト中: chart_1.png
+    ✓ 画像2 挿入完了
+  [3/3] 画像をペースト中: chart_2.png
+    ✓ 画像3 挿入完了
+  下書き保存中...
+  「下書き保存」クリック完了
+  下書き保存完了: https://note.com/kawasewatson0106/n/ne2b0feacbacb
+
+✅ 下書き保存成功: https://note.com/kawasewatson0106/n/ne2b0feacbacb
+
+==================================================
+✅ パイプライン完了
+==================================================
+投稿URL: https://note.com/kawasewatson0106/n/ne2b0feacbacb
+
+── 記事履歴を更新中...
+  履歴保存: 2026-03-23 | 
+終了コード: 0
+実行終了: 2026-03-23 07:04:31
+========================================
+実行開始: 2026-03-24 07:00:04
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 6 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: note トレンド
+  note: 20 件取得
+  取得合計: 196 件
+  重複除去後: 186 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] Oil Tumbles as Trump Eases Iran Threats
+  2. [Bloomberg Technology] John Ternus Emerges as Tim Cook's Possible Successor
+  3. [Nikkei Asia] Toyota to invest $1bn in US factories to boost EV, hybrid capacit
+  4. [Yahoo Finance] Daily Spotlight: Financial Conditions: So Far, So Good
+  5. [Yahoo Finance Japan] 日本板硝子 株式の非公開化を検討
+  6. [CNBC] Dow surges 600 points in relief rally after Trump says U.S. and I
+  7. [MarketWatch] These chip stocks could be winners as Elon Musk executes on his ‘
+  8. [ロイター] 米アップル、今年の世界開発者会議は6月8―12日に開催
+  9. [日経新聞] キオクシア時価総額15倍の作り方　AI特需×ファンド改革で好循環
+  10. [note] 投資戦略
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Gemini 深掘り分析
+────────────────────────────────────────
+=== ② Gemini Deep Research ===
+  Gemini で深掘り分析中...
+  ドラフト生成完了（7286 文字）
+保存: output/draft.json
+
+--- ドラフト冒頭 ---
+## 今日のポイント
+
+*   イラン情勢緩和で原油安・市場に安堵感
+*   トヨタが米国でEV・HV生産を強化へ
+*   キオクシア、AI特需で再評価の兆し
+
+---
+
+## ニュース① イラン情勢緩和で市場に安堵、原油安・株高が加速
+
+### どんなニュース？
+本日、トランプ米大統領がイランへの軍事攻撃を一時的に停止し、さらに両国間で「生産的な」対話が行われたと報じられました。この突然の発表を受けて、これまで緊迫していた中東情勢に対する市場の懸念が大きく和らぎ、投資家たちの間に安堵感が広がったんです。特に、原油価格は急激に下落し、一時は史上最大級の価格変動を記録したとされています。これに連
+
+────────────────────────────────────────
+  ③ Claude 添削
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  Gemini で添削・肉付け中...
+  添削完了（12291 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## 今日のポイント、そしてプロの視点
+
+皆さん、こんにちは！投資歴20年以上のプロ投資家ブロガー、カブヨミです。
+
+今日の市場は、まさに「動」と「静」、そして「未来」が交錯する一日でしたね。中東情勢の緩和という大きな地政学リスクの変動、そして日本の主要企業が示す未来への戦略、さらにはAIという最先端テクノロジーがもたらす産業構造の変化。これらが今日の市場の主役だったんです。
+
+具体的に今日のポイントをまとめると、こんな感じでした。
+
+*   **イラン情勢緩和で原油安・市場に安堵感**：地政学リスクの低下が、世界経済に一息つかせました。
+*   **トヨタが米国でEV・HV生産を強化へ**：
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 3 画像生成（カバー＋本文図表・説明画像） ===
+  カバー画像生成中（Gemini 3 Pro）...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (919KB)
+  カバー画像: output/images/cover.png
+  画像挿入箇所を分析中（Gemini 2.5 Flashが記事全文を読んで判断）...
+  3 箇所の画像を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ比較表 (comparison_table)
+    [3] 今日の投資ポイント (infographic)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (389KB)
+  [2/3] 主要データ比較表 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (583KB)
+  [3/3] 今日の投資ポイント 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (648KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  タイトル固定: 新聞よりわかりやすくて早い今日の投資ニュース速報
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: 新聞よりわかりやすくて早い今日の投資ニュース速報
+  本文: 12330 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+  note にログイン中...
+  ログイン成功（API）
+  エディタを開いています...
+  エディタURL: https://editor.note.com/notes/nfad9ea07c7ee/edit/
+  タイトル入力中...
+  カバー画像を設定中...
+  本文入力中（12330 文字）...
+  [1/3] 画像をペースト中: chart_2.png
+    ✓ 画像1 挿入完了
+  [2/3] 画像をペースト中: chart_0.png
+    ✓ 画像2 挿入完了
+  [3/3] 画像をペースト中: chart_1.png
+    ✓ 画像3 挿入完了
+  下書き保存中...
+  「下書き保存」クリック完了
+  下書き保存完了: https://note.com/kawasewatson0106/n/nfad9ea07c7ee
+
+✅ 下書き保存成功: https://note.com/kawasewatson0106/n/nfad9ea07c7ee
+
+==================================================
+✅ パイプライン完了
+==================================================
+投稿URL: https://note.com/kawasewatson0106/n/nfad9ea07c7ee
+
+── 記事履歴を更新中...
+  履歴保存: 2026-03-24 | 
+終了コード: 0
+実行終了: 2026-03-24 07:05:20
+========================================
+実行開始: 2026-03-25 07:00:05
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+==================================================
+投資記事自動生成パイプライン 開始
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 7 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: Yahoo Japan トップ
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: NHK 経済
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: Google Trends JP
+  Google Trends JP: 30 件取得
+  取得中: note トレンド
+  note: 20 件取得
+  取得合計: 253 件
+  重複除去後: 239 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] Victory Capital Withdraws Bid for Janus Henderson
+  2. [Bloomberg Technology] Meta Deceived New Mexico Teens About Platform Safety, Jury Finds
+  3. [Nikkei Asia] Taiwan self-driving startup eyes Japan as launchpad for niche sys
+  4. [Yahoo Finance] Daily Spotlight: War Roils Oil Price Outlook
+  5. [Yahoo Finance Japan] 中部電の専務辞任 セクハラ発言で
+  6. [Yahoo Japan トップ] 予算案 年度内成立は困難な情勢
+  7. [CNBC] Meta must pay $375 million for violating New Mexico law in child 
+  8. [MarketWatch] Software stocks fall as fear of AI disruption is back in full for
+  9. [NHK 経済] トランプ大統領 イランとの協議主張 “合意結びたがっている”
+  10. [ロイター] 欧州委、ロ産原油輸入停止法案先送り　「地政学的状況」が理由で
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Claude 記事執筆
+────────────────────────────────────────
+=== ② Claude 記事執筆 ===
+  Gemini で執筆中（フォールバック）...
+  Gemini 執筆完了（10370 文字）
+保存: output/draft.json
+
+--- 記事冒頭 ---
+## 今日のポイント
+*   原油市場は地政学リスクで不透明感増大。
+*   Metaが巨額賠償命令、プラットフォーム規制強化。
+*   金融業界M&A撤回、市場の健全性を示す。
+
+---
+
+## ニュース① 地政学リスクが原油市場を揺るがす！インフレ再燃の懸念も
+
+### どんなニュース？
+今日お届けする最初のニュースは、原油市場を取り巻く地政学的な緊張感の高まりについてです。まず、アメリカのトランプ大統領が、イランと「強く合意を結びたがっている」として協議を行っていると主張したことが報じられていますよね。これは中東情勢の安定化に繋がる可能性もあれば、逆に交渉決裂で緊張が高まるリスクもはらん
+
+────────────────────────────────────────
+  ③ クリーンアップ
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  クリーンアップ完了（10370 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## 今日のポイント
+*   原油市場は地政学リスクで不透明感増大。
+*   Metaが巨額賠償命令、プラットフォーム規制強化。
+*   金融業界M&A撤回、市場の健全性を示す。
+
+---
+
+## ニュース① 地政学リスクが原油市場を揺るがす！インフレ再燃の懸念も
+
+### どんなニュース？
+今日お届けする最初のニュースは、原油市場を取り巻く地政学的な緊張感の高まりについてです。まず、アメリカのトランプ大統領が、イランと「強く合意を結びたがっている」として協議を行っていると主張したことが報じられていますよね。これは中東情勢の安定化に繋がる可能性もあれば、逆に交渉決裂で緊張が高まるリスクもはらん
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 3 画像生成（カバー＋本文図表・説明画像） ===
+  カバー画像生成中（Gemini 3 Pro）...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (896KB)
+  カバー画像: output/images/cover.png
+  画像挿入箇所を分析中（Gemini 2.5 Flashが記事全文を読んで判断）...
+  3 箇所の画像を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ比較表 (comparison_table)
+    [3] 今日の投資ポイント (infographic)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (360KB)
+  [2/3] 主要データ比較表 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (536KB)
+  [3/3] 今日の投資ポイント 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (654KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  タイトル固定: 新聞よりわかりやすくて早い今日の投資ニュース速報
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: 新聞よりわかりやすくて早い今日の投資ニュース速報
+  本文: 10409 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+  note にログイン中...
+  ログイン成功（API）
+  エディタを開いています...
+  エディタURL: https://editor.note.com/notes/nf79650d0f5a3/edit/
+  タイトル入力中...
+  カバー画像を設定中...
+  本文入力中（10409 文字）...
+  [1/3] 画像をペースト中: chart_0.png
+    ✓ 画像1 挿入完了
+  [2/3] 画像をペースト中: chart_1.png
+    ✓ 画像2 挿入完了
+  [3/3] 画像をペースト中: chart_2.png
+    ✓ 画像3 挿入完了
+  下書き保存中...
+  「下書き保存」クリック完了
+  下書き保存完了: https://note.com/kawasewatson0106/n/nf79650d0f5a3
+
+✅ 下書き保存成功: https://note.com/kawasewatson0106/n/nf79650d0f5a3
+
+────────────────────────────────────────
+  ⑦ YouTube note 下書き
+────────────────────────────────────────
+=== YouTube note パイプライン ===
+
+  [YouTube] 題材選定中...
+
+  [YouTube] Claude 深掘りリサーチ...
+  Gemini で深掘りリサーチ中（フォールバック）...
+  Gemini記事生成完了（10187 文字）
+
+  [YouTube] Gemini 3.0 で画像・図表挿入...
+=== ④ Gemini 3 画像生成（カバー＋本文図表・説明画像） ===
+  カバー画像生成中（Gemini 3 Pro）...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (823KB)
+  カバー画像: output/images/cover.png
+  画像挿入箇所を分析中（Gemini 2.5 Flashが記事全文を読んで判断）...
+Traceback (most recent call last):
+  File "/Users/watson/investment-content-auto/src/main.py", line 47, in run_pipeline
+    func()
+  File "/Users/watson/investment-content-auto/src/youtube_note_pipeline.py", line 332, in main
+    run_youtube_note_pipeline()
+  File "/Users/watson/investment-content-auto/src/youtube_note_pipeline.py", line 307, in run_youtube_note_pipeline
+    url = post_to_note.post_article(
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 191, in post_article
+    login(driver, wait)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 60, in login
+    driver.get("https://note.com/login")
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 665, in get
+    return super().get(url)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 483, in get
+    self.execute(Command.GET, {"url": url})
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.NoSuchWindowException: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=146.0.7680.154)
+Stacktrace:
+0   undetected_chromedriver             0x000000010536ef38 undetected_chromedriver + 6733624
+1   undetected_chromedriver             0x00000001053666ea undetected_chromedriver + 6698730
+2   undetected_chromedriver             0x0000000104d71995 undetected_chromedriver + 453013
+3   undetected_chromedriver             0x0000000104d44dc8 undetected_chromedriver + 269768
+4   undetected_chromedriver             0x0000000104df3b48 undetected_chromedriver + 985928
+5   undetected_chromedriver             0x0000000104e0d868 undetected_chromedriver + 1091688
+6   undetected_chromedriver             0x0000000104db8307 undetected_chromedriver + 742151
+7   undetected_chromedriver             0x0000000104db90e1 undetected_chromedriver + 745697
+8   undetected_chromedriver             0x000000010532876c undetected_chromedriver + 6444908
+9   undetected_chromedriver             0x000000010532cb62 undetected_chromedriver + 6462306
+10  undetected_chromedriver             0x000000010530993c undetected_chromedriver + 6318396
+11  undetected_chromedriver             0x000000010532d5b8 undetected_chromedriver + 6464952
+12  undetected_chromedriver             0x00000001052f8ce0 undetected_chromedriver + 6249696
+13  undetected_chromedriver             0x00000001053537e8 undetected_chromedriver + 6621160
+14  undetected_chromedriver             0x00000001053539a2 undetected_chromedriver + 6621602
+15  undetected_chromedriver             0x00000001053662f1 undetected_chromedriver + 6697713
+16  libsystem_pthread.dylib             0x00007ff81a83ee59 _pthread_start + 115
+17  libsystem_pthread.dylib             0x00007ff81a83a857 thread_start + 15
+
+  3 箇所の画像を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ比較表 (comparison_table)
+    [3] 今日の投資ポイント (infographic)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (492KB)
+  [2/3] 主要データ比較表 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (583KB)
+  [3/3] 今日の投資ポイント 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (720KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+  [YouTube] note 下書き保存...
+  note にログイン中...
+
+❌ ⑦ YouTube note 下書き でエラー発生:
+========================================
+実行開始: 2026-03-26 07:00:05
+========================================
+/Users/watson/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/watson/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+Traceback (most recent call last):
+  File "/Users/watson/investment-content-auto/src/main.py", line 86, in run_pipeline
+    result = func()
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 459, in main
+    url = post_article(title, body, image_paths, NOTE_TAGS, headless=headless, cover_path=cover_path)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 192, in post_article
+    driver = build_driver(headless=headless)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 55, in build_driver
+    return uc.Chrome(options=options, headless=headless)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 466, in __init__
+    super(Chrome, self).__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chrome/webdriver.py", line 46, in __init__
+    super().__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chromium/webdriver.py", line 71, in __init__
+    super().__init__(command_executor=executor, options=options)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 263, in __init__
+    self.start_session(capabilities)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 724, in start_session
+    super(selenium.webdriver.chrome.webdriver.WebDriver, self).start_session(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 366, in start_session
+    response = self.execute(Command.NEW_SESSION, caps)["value"]
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.SessionNotCreatedException: Message: session not created: cannot connect to chrome at 127.0.0.1:52299
+from session not created: This version of ChromeDriver only supports Chrome version 147
+Current browser version is 146.0.7680.154; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#sessionnotcreatedexception
+Stacktrace:
+0   undetected_chromedriver             0x00000001034d4d38 undetected_chromedriver + 6798648
+1   undetected_chromedriver             0x00000001034cc3ba undetected_chromedriver + 6763450
+2   undetected_chromedriver             0x0000000102ec7825 undetected_chromedriver + 452645
+3   undetected_chromedriver             0x0000000102f0b049 undetected_chromedriver + 729161
+4   undetected_chromedriver             0x0000000102f09e51 undetected_chromedriver + 724561
+5   undetected_chromedriver             0x0000000102efeb89 undetected_chromedriver + 678793
+6   undetected_chromedriver             0x0000000102f501da undetected_chromedriver + 1012186
+7   undetected_chromedriver             0x0000000102f4f89c undetected_chromedriver + 1009820
+8   undetected_chromedriver             0x0000000102f0e187 undetected_chromedriver + 741767
+9   undetected_chromedriver             0x0000000102f0ef61 undetected_chromedriver + 745313
+10  undetected_chromedriver             0x000000010348d7c7 undetected_chromedriver + 6506439
+11  undetected_chromedriver             0x0000000103491c4a undetected_chromedriver + 6523978
+12  undetected_chromedriver             0x000000010346e4fa undetected_chromedriver + 6378746
+13  undetected_chromedriver             0x00000001034926b8 undetected_chromedriver + 6526648
+14  undetected_chromedriver             0x000000010345dba0 undetected_chromedriver + 6310816
+15  undetected_chromedriver             0x00000001034b96b8 undetected_chromedriver + 6686392
+16  undetected_chromedriver             0x00000001034b9872 undetected_chromedriver + 6686834
+17  undetected_chromedriver             0x00000001034cbfd1 undetected_chromedriver + 6762449
+18  libsystem_pthread.dylib             0x00007ff81a83ee59 _pthread_start + 115
+19  libsystem_pthread.dylib             0x00007ff81a83a857 thread_start + 15
+
+==================================================
+投資記事自動生成パイプライン 開始
+  日時: 2026-03-26 07:00 JST  曜日: 木
+==================================================
+
+────────────────────────────────────────
+  ① ニュース収集
+────────────────────────────────────────
+=== ① ニュース収集 ===
+  過去記事履歴: 7 件参照
+  取得中: Bloomberg Markets
+  取得中: Bloomberg Technology
+  取得中: Nikkei Asia
+  取得中: Yahoo Finance
+  取得中: Yahoo Finance Japan
+  取得中: Yahoo Japan トップ
+  取得中: CNBC
+  取得中: MarketWatch
+  取得中: NHK 経済
+  取得中: ロイター日本語版
+  ロイター: 20 件取得
+  取得中: 日経新聞
+  日経: 15 件取得
+  取得中: Google Trends JP
+  Google Trends JP: 28 件取得
+  取得中: note トレンド
+  note: 19 件取得
+  取得合計: 255 件
+  重複除去後: 243 件
+  Gemini で注目度分析・選定中...
+
+選出記事 (10 件):
+  1. [Bloomberg Markets] OpenAI Discontinues Support for Sora, Winds Down Disney Deal
+  2. [Bloomberg Technology] Meta, Google Found Liable in First Social Media Addiction Trial
+  3. [Nikkei Asia] Japan to expand hospital oversight to curb for-profit medicine
+  4. [Yahoo Finance] Market Digest: ADM, OGE
+  5. [Yahoo Finance Japan] ソニー・ホンダ AFEELA開発中止
+  6. [Yahoo Japan トップ] 米中首脳会談 5月14日・15日に
+  7. [CNBC] Iran has no intention to hold talks with U.S; foreign minister sa
+  8. [MarketWatch] Arm’s stock shoots to best day in a year as an Nvidia-like chapte
+  9. [NHK 経済] ハンガリー ウクライナへの天然ガス供給を停止へ 対立深まる
+  10. [ロイター] 米メタとグーグルに損害賠償評決、若者に危険なプラットフォーム設計巡り
+
+保存: output/collected_news.json
+
+────────────────────────────────────────
+  ② Claude 記事執筆（個人視点）
+────────────────────────────────────────
+=== ② Claude 記事執筆 ===
+  Gemini で執筆中（フォールバック）...
+  Gemini 執筆完了（5358 文字）
+保存: output/draft.json
+
+--- 記事冒頭 ---
+## 結論：Armは今、買いだと私が考える理由
+私がArm（ARM）の株を今、買いだと考える理由は大きく二つあります。一つは、AIの進化が「学習」フェーズから「推論」フェーズへと移行する中で、ArmのIP（知的財産）ライセンスモデルがエッジデバイス（末端機器）におけるAIチップのデファクトスタンダード（事実上の標準）となる可能性を秘めているからです。もう一つは、NVIDIAとは異なるビジネスモデルが、生成AIの多様なデバイスへの普及を強力に後押しし、半導体業界の「次のNVIDIA」となる成長ドライバーを内包していると見ているからです。
+
+---
+
+## そもそも何が起きているのか
+今週、私を最
+
+────────────────────────────────────────
+  ③ クリーンアップ
+────────────────────────────────────────
+=== ③ Claude API 添削 ===
+  クリーンアップ完了（5358 文字）
+保存: output/polished.json
+
+--- 添削後冒頭 ---
+## 結論：Armは今、買いだと私が考える理由
+私がArm（ARM）の株を今、買いだと考える理由は大きく二つあります。一つは、AIの進化が「学習」フェーズから「推論」フェーズへと移行する中で、ArmのIP（知的財産）ライセンスモデルがエッジデバイス（末端機器）におけるAIチップのデファクトスタンダード（事実上の標準）となる可能性を秘めているからです。もう一つは、NVIDIAとは異なるビジネスモデルが、生成AIの多様なデバイスへの普及を強力に後押しし、半導体業界の「次のNVIDIA」となる成長ドライバーを内包していると見ているからです。
+
+---
+
+## そもそも何が起きているのか
+今週、私を最
+
+────────────────────────────────────────
+  ④ 画像生成
+────────────────────────────────────────
+=== ④ Gemini 3 画像生成（カバー＋本文図表・説明画像） ===
+  カバー画像生成中（Gemini 3 Pro）...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (778KB)
+  カバー画像: output/images/cover.png
+  画像挿入箇所を分析中（Gemini 2.5 Flashが記事全文を読んで判断）...
+  3 箇所の画像を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ比較表 (comparison_table)
+    [3] 今日の投資ポイント (infographic)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (366KB)
+  [2/3] 主要データ比較表 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (631KB)
+  [3/3] 今日の投資ポイント 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (769KB)
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+────────────────────────────────────────
+  ⑤ タイトル生成（動的）
+────────────────────────────────────────
+=== ⑤ タイトル生成 ===
+  Gemini でタイトル生成中...
+  3 案のタイトルを生成
+  選択タイトル: なぜ誰もArmを語らない？NVIDIAを超越するAI戦略
+
+保存: output/final.json
+
+────────────────────────────────────────
+  ⑥ note 投稿（無料）
+────────────────────────────────────────
+=== ⑥ note.com 自動投稿 ===
+  タイトル: なぜ誰もArmを語らない？NVIDIAを超越するAI戦略
+  本文: 5397 文字
+  本文画像: 3 枚
+  カバー画像: output/images/cover.png
+
+❌ ⑥ note 投稿（無料） でエラー発生:
+
+────────────────────────────────────────
+  ⑦ YouTube note 下書き
+────────────────────────────────────────
+=== YouTube note パイプライン ===
+
+  [YouTube] 題材選定中...
+
+  [YouTube] Claude 深掘りリサーチ...
+  Gemini で深掘りリサーチ中（フォールバック）...
+  Gemini記事生成完了（10723 文字）
+
+  [YouTube] Gemini 3.0 で画像・図表挿入...
+=== ④ Gemini 3 画像生成（カバー＋本文図表・説明画像） ===
+  カバー画像生成中（Gemini 3 Pro）...
+    生成完了 [gemini-3-pro-image-preview]: cover.png (961KB)
+  カバー画像: output/images/cover.png
+  画像挿入箇所を分析中（Gemini 2.5 Flashが記事全文を読んで判断）...
+  3 箇所の画像を生成予定
+    [1] 主要銘柄・指数の比較 (bar_chart)
+    [2] 主要データ比較表 (comparison_table)
+    [3] 今日の投資ポイント (infographic)
+  [1/3] 主要銘柄・指数の比較 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_0.png (353KB)
+  [2/3] 主要データ比較表 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_1.png (671KB)
+  [3/3] 今日の投資ポイント 生成中...
+    生成完了 [gemini-3-pro-image-preview]: chart_2.png (782KB)
+Traceback (most recent call last):
+  File "/Users/watson/investment-content-auto/src/main.py", line 86, in run_pipeline
+    result = func()
+  File "/Users/watson/investment-content-auto/src/youtube_note_pipeline.py", line 332, in main
+    run_youtube_note_pipeline()
+  File "/Users/watson/investment-content-auto/src/youtube_note_pipeline.py", line 307, in run_youtube_note_pipeline
+    url = post_to_note.post_article(
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 192, in post_article
+    driver = build_driver(headless=headless)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 55, in build_driver
+    return uc.Chrome(options=options, headless=headless)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 466, in __init__
+    super(Chrome, self).__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chrome/webdriver.py", line 46, in __init__
+    super().__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chromium/webdriver.py", line 71, in __init__
+    super().__init__(command_executor=executor, options=options)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 263, in __init__
+    self.start_session(capabilities)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 724, in start_session
+    super(selenium.webdriver.chrome.webdriver.WebDriver, self).start_session(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 366, in start_session
+    response = self.execute(Command.NEW_SESSION, caps)["value"]
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.SessionNotCreatedException: Message: session not created: cannot connect to chrome at 127.0.0.1:52387
+from session not created: This version of ChromeDriver only supports Chrome version 147
+Current browser version is 146.0.7680.154; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#sessionnotcreatedexception
+Stacktrace:
+0   undetected_chromedriver             0x00000001034cad38 undetected_chromedriver + 6798648
+1   undetected_chromedriver             0x00000001034c23ba undetected_chromedriver + 6763450
+2   undetected_chromedriver             0x0000000102ebd825 undetected_chromedriver + 452645
+3   undetected_chromedriver             0x0000000102f01049 undetected_chromedriver + 729161
+4   undetected_chromedriver             0x0000000102effe51 undetected_chromedriver + 724561
+5   undetected_chromedriver             0x0000000102ef4b89 undetected_chromedriver + 678793
+6   undetected_chromedriver             0x0000000102f461da undetected_chromedriver + 1012186
+7   undetected_chromedriver             0x0000000102f4589c undetected_chromedriver + 1009820
+8   undetected_chromedriver             0x0000000102f04187 undetected_chromedriver + 741767
+9   undetected_chromedriver             0x0000000102f04f61 undetected_chromedriver + 745313
+10  undetected_chromedriver             0x00000001034837c7 undetected_chromedriver + 6506439
+11  undetected_chromedriver             0x0000000103487c4a undetected_chromedriver + 6523978
+12  undetected_chromedriver             0x00000001034644fa undetected_chromedriver + 6378746
+13  undetected_chromedriver             0x00000001034886b8 undetected_chromedriver + 6526648
+14  undetected_chromedriver             0x0000000103453ba0 undetected_chromedriver + 6310816
+15  undetected_chromedriver             0x00000001034af6b8 undetected_chromedriver + 6686392
+16  undetected_chromedriver             0x00000001034af872 undetected_chromedriver + 6686834
+17  undetected_chromedriver             0x00000001034c1fd1 undetected_chromedriver + 6762449
+18  libsystem_pthread.dylib             0x00007ff81a83ee59 _pthread_start + 115
+19  libsystem_pthread.dylib             0x00007ff81a83a857 thread_start + 15
+
+Traceback (most recent call last):
+  File "/Users/watson/investment-content-auto/src/main.py", line 163, in run_pipeline
+    manage_magazine.main()
+  File "/Users/watson/investment-content-auto/src/manage_magazine.py", line 162, in main
+    driver = post_to_note.build_driver(headless=headless)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 55, in build_driver
+    return uc.Chrome(options=options, headless=headless)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 466, in __init__
+    super(Chrome, self).__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chrome/webdriver.py", line 46, in __init__
+    super().__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chromium/webdriver.py", line 71, in __init__
+    super().__init__(command_executor=executor, options=options)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 263, in __init__
+    self.start_session(capabilities)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 724, in start_session
+    super(selenium.webdriver.chrome.webdriver.WebDriver, self).start_session(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 366, in start_session
+    response = self.execute(Command.NEW_SESSION, caps)["value"]
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.SessionNotCreatedException: Message: session not created: cannot connect to chrome at 127.0.0.1:52458
+from session not created: This version of ChromeDriver only supports Chrome version 147
+Current browser version is 146.0.7680.154; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#sessionnotcreatedexception
+Stacktrace:
+0   undetected_chromedriver             0x0000000100c7ad38 undetected_chromedriver + 6798648
+1   undetected_chromedriver             0x0000000100c723ba undetected_chromedriver + 6763450
+2   undetected_chromedriver             0x000000010066d825 undetected_chromedriver + 452645
+3   undetected_chromedriver             0x00000001006b1049 undetected_chromedriver + 729161
+4   undetected_chromedriver             0x00000001006afe51 undetected_chromedriver + 724561
+5   undetected_chromedriver             0x00000001006a4b89 undetected_chromedriver + 678793
+6   undetected_chromedriver             0x00000001006f61da undetected_chromedriver + 1012186
+7   undetected_chromedriver             0x00000001006f589c undetected_chromedriver + 1009820
+8   undetected_chromedriver             0x00000001006b4187 undetected_chromedriver + 741767
+9   undetected_chromedriver             0x00000001006b4f61 undetected_chromedriver + 745313
+10  undetected_chromedriver             0x0000000100c337c7 undetected_chromedriver + 6506439
+11  undetected_chromedriver             0x0000000100c37c4a undetected_chromedriver + 6523978
+12  undetected_chromedriver             0x0000000100c144fa undetected_chromedriver + 6378746
+13  undetected_chromedriver             0x0000000100c386b8 undetected_chromedriver + 6526648
+14  undetected_chromedriver             0x0000000100c03ba0 undetected_chromedriver + 6310816
+15  undetected_chromedriver             0x0000000100c5f6b8 undetected_chromedriver + 6686392
+16  undetected_chromedriver             0x0000000100c5f872 undetected_chromedriver + 6686834
+17  undetected_chromedriver             0x0000000100c71fd1 undetected_chromedriver + 6762449
+18  libsystem_pthread.dylib             0x00007ff81a83ee59 _pthread_start + 115
+19  libsystem_pthread.dylib             0x00007ff81a83a857 thread_start + 15
+
+Traceback (most recent call last):
+  File "/Users/watson/investment-content-auto/src/main.py", line 187, in run_pipeline
+    update_note_profile.main()
+  File "/Users/watson/investment-content-auto/src/update_note_profile.py", line 126, in main
+    driver = post_to_note.build_driver(headless=headless)
+  File "/Users/watson/investment-content-auto/src/post_to_note.py", line 55, in build_driver
+    return uc.Chrome(options=options, headless=headless)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 466, in __init__
+    super(Chrome, self).__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chrome/webdriver.py", line 46, in __init__
+    super().__init__(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/chromium/webdriver.py", line 71, in __init__
+    super().__init__(command_executor=executor, options=options)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 263, in __init__
+    self.start_session(capabilities)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/undetected_chromedriver/__init__.py", line 724, in start_session
+    super(selenium.webdriver.chrome.webdriver.WebDriver, self).start_session(
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 366, in start_session
+    response = self.execute(Command.NEW_SESSION, caps)["value"]
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+  File "/Users/watson/Library/Python/3.9/lib/python/site-packages/selenium/webdriver/remote/errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.SessionNotCreatedException: Message: session not created: cannot connect to chrome at 127.0.0.1:52507
+from session not created: This version of ChromeDriver only supports Chrome version 147
+Current browser version is 146.0.7680.154; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#sessionnotcreatedexception
+Stacktrace:
+0   undetected_chromedriver             0x0000000104f63d38 undetected_chromedriver + 6798648
+1   undetected_chromedriver             0x0000000104f5b3ba undetected_chromedriver + 6763450
+2   undetected_chromedriver             0x0000000104956825 undetected_chromedriver + 452645
+3   undetected_chromedriver             0x000000010499a049 undetected_chromedriver + 729161
+4   undetected_chromedriver             0x0000000104998e51 undetected_chromedriver + 724561
+5   undetected_chromedriver             0x000000010498db89 undetected_chromedriver + 678793
+6   undetected_chromedriver             0x00000001049df1da undetected_chromedriver + 1012186
+7   undetected_chromedriver             0x00000001049de89c undetected_chromedriver + 1009820
+8   undetected_chromedriver             0x000000010499d187 undetected_chromedriver + 741767
+9   undetected_chromedriver             0x000000010499df61 undetected_chromedriver + 745313
+10  undetected_chromedriver             0x0000000104f1c7c7 undetected_chromedriver + 6506439
+11  undetected_chromedriver             0x0000000104f20c4a undetected_chromedriver + 6523978
+12  undetected_chromedriver             0x0000000104efd4fa undetected_chromedriver + 6378746
+13  undetected_chromedriver             0x0000000104f216b8 undetected_chromedriver + 6526648
+14  undetected_chromedriver             0x0000000104eecba0 undetected_chromedriver + 6310816
+15  undetected_chromedriver             0x0000000104f486b8 undetected_chromedriver + 6686392
+16  undetected_chromedriver             0x0000000104f48872 undetected_chromedriver + 6686834
+17  undetected_chromedriver             0x0000000104f5afd1 undetected_chromedriver + 6762449
+18  libsystem_pthread.dylib             0x00007ff81a83ee59 _pthread_start + 115
+19  libsystem_pthread.dylib             0x00007ff81a83a857 thread_start + 15
+
+  本文画像 3 枚のプレースホルダーを挿入
+  合計 3 枚の本文画像を挿入
+保存: output/article_with_images.json
+
+  [YouTube] note 下書き保存...
+
+❌ ⑦ YouTube note 下書き でエラー発生:
+
+────────────────────────────────────────
+  ⑧ PDCAトラッカー（スキ数更新）
+────────────────────────────────────────
+=== PDCA トラッカー（dailyモード） ===
+  [PDCA] スキ数更新: 11件
+
+────────────────────────────────────────
+  ⑪ マガジン自動管理
+────────────────────────────────────────
+=== マガジン自動管理 ===
+  [WARN] マガジン管理エラー（継続）:
+
+────────────────────────────────────────
+  ⑫ 異常検知・チェック
+────────────────────────────────────────
+  🚨 異常検知: 本日の投稿が見当たりません（最終: 0001-01-01）
+
+────────────────────────────────────────
+  プロフィール更新
+────────────────────────────────────────
+=== プロフィール更新 ===
+  [WARN] プロフィール更新エラー（継続）:
+
+==================================================
+✅ パイプライン完了
+==================================================
+投稿URL: https://note.com/kawasewatson0106/n/nf79650d0f5a3
+
+── 記事履歴を更新中...
+  履歴保存: 2026-03-26 | 
+
+── 日次レポート ──
+【TATSUJIN TRADE 日次レポート】
+2026-03-26 (木)
+
+✅ 本日の記事: https://note.com/kawasewatson0106/n/nf79650d0f5a3
+
+📊 パフォーマンス
+  総記事数: 108本  総スキ: 458
+  全期間平均: 4.2スキ  最高: 17スキ
+  直近7日平均: 3.4スキ（7本）
+
+🏆 スキTOP3
+  1. キティの逆襲──サンリオ株が4年で6倍になった理由… (17スキ)
+  2. 高市早苗で株はどう動く？──上昇セクターと注目銘柄… (13スキ)
+  3. 【保存版】エントリーしてはいけない水準… (13スキ)
+
+💡 推奨: 投稿は日/土曜日、疑問形+数字（例：「2026年のNISAはまだS&P 500だけで大丈」）
+
+🚨 アラート (1件)
+  ・本日の投稿が見当たりません（最終: 0001-01-01）
+  [INFO] 通知先未設定（LINE_NOTIFY_TOKEN / SLACK_WEBHOOK_URL）
+終了コード: 0
+実行終了: 2026-03-26 07:06:39

@@ -101,30 +101,30 @@ def identify_chart_sections(article_text: str) -> list[dict]:
     """Gemini 2.5 Flashが記事全文を読み、画像で説明した方が分かりやすい箇所を2〜4箇所特定"""
     client = genai.Client(api_key=GEMINI_API_KEY)
 
-    prompt = f"""あなたは投資ブログの編集者です。以下の記事を読んで、**画像があると読者の理解が格段に深まる箇所**を2〜4箇所特定してください。
+    prompt = f"""あなたは投資ブログの編集者です。以下の記事を読んで、**画像・図・グラフ・表を挿入すると読者の理解が格段に深まる箇所**を2〜4箇所特定してください。
 
-【最重要ルール】
-画像は「その段落を読んだ読者が、文章だけでは掴みにくいことを一目で理解できる」ものでなければならない。
-記事の前後の文脈を無視した汎用的な画像（適当な棒グラフ、関係ない比較表など）は絶対NG。
+【重要】画像は必ずこの記事の具体的な内容に即したものを生成すること。
+- 記事に登場する具体的な銘柄名・指数名・数値・企業名を必ず「prompt_ja」に含めること
+- 汎用的な「金融メディア風」「投資ポイント」などの抽象的な指示ではなく、この記事固有の内容を反映させること
 
-【画像の種類と使い分け】
-1. 記事に具体的な数値が3つ以上並んでいる段落 → その数値を正確に使ったグラフ・表
-2. 複雑な仕組み・因果関係・プロセスを説明している段落 → 概念図・フローチャート
-3. 市場の雰囲気・感情・状況を描写している段落 → その状況を象徴する写真風イメージ画像
-4. シナリオ分析（強気/弱気等）→ シナリオの対比を視覚化したイメージ
+【判断基準】
+- 複数の数値・指標を比較している → 棒グラフ・表
+- 時系列の変化・推移を説明している → 折れ線グラフ
+- 複数の要因・仕組みを説明している → インフォグラフィック・概念図
+- 構造・フロー・因果関係を説明している → フローチャート
+- 複数の選択肢・シナリオを比較している → 比較表
+- 割合・構成を説明している → 円グラフ
 
 【記事全文】
-{article_text[:6000]}
+{article_text[:7000]}
 
 以下のJSON配列で出力してください（要素数は2〜4、JSONのみ、余分な説明不要）：
 [
   {{
     "position": "挿入したい段落の最初の25文字をそのままコピー（完全一致）",
-    "context": "挿入箇所の前後300文字をそのままコピー（画像生成AIが文脈を理解するために必要）",
-    "chart_type": "bar_chart|line_chart|pie_chart|table|infographic|comparison_table|flowchart|concept_diagram|image のいずれか",
-    "description": "日本語での画像タイトル（20字以内）",
-    "why": "この箇所に画像が必要な理由（読者がこの画像を見ることで何を理解できるか）を1文で",
-    "prompt_ja": "Gemini画像生成への具体的な指示。記事の文脈（context）の内容を正確に反映すること。数値がある場合はその数値を使う。イメージ画像の場合は記事で語られている具体的な状況・テーマを描写する指示にする。500字以内。"
+    "chart_type": "bar_chart|line_chart|pie_chart|table|infographic|comparison_table|flowchart|concept_diagram のいずれか",
+    "description": "日本語での図表タイトル（20字以内）",
+    "prompt_ja": "Geminiへの詳細な画像生成指示（日本語）。この記事に登場する具体的な銘柄名・企業名・数値・指数名を必ず含めること。汎用的な指示ではなくこの記事固有の内容を反映すること。タイトル・軸・凡例はすべて日本語。プロの金融メディア品質。300字以内。"
   }}
 ]"""
 
@@ -143,21 +143,19 @@ def identify_chart_sections(article_text: str) -> list[dict]:
     except Exception as e:
         print(f"  [WARN] 図表箇所特定エラー: {e}")
 
-    # フォールバック：記事テーマに合ったイメージ画像3枚
+    # フォールバック：3箇所固定
     paragraphs = [p.strip() for p in article_text.split("\n\n") if len(p.strip()) > 50]
     total = len(paragraphs)
-    # 記事冒頭からキーワードを抽出
-    snippet = article_text[:500]
     return [
-        {"position": paragraphs[total//4][:25] if total > 4 else "", "chart_type": "image",
-         "description": "記事テーマのイメージ",
-         "prompt_ja": f"投資ブログ用のイメージ画像。記事テーマ:「{snippet[:100]}」を象徴する、株式市場・金融をテーマにした写真風の高品質画像。ダークトーン、プロフェッショナルな雰囲気。16:9横長。"},
-        {"position": paragraphs[total//2][:25] if total > 2 else "", "chart_type": "image",
-         "description": "市場分析イメージ",
-         "prompt_ja": "投資家がモニターで株式チャートを分析している写真風イメージ。複数のモニターにチャートやデータが表示。プロフェッショナルな雰囲気。16:9横長。高品質。"},
-        {"position": paragraphs[total*3//4][:25] if total > 3 else "", "chart_type": "image",
-         "description": "投資戦略イメージ",
-         "prompt_ja": "投資戦略・意思決定をイメージした写真風画像。チェスの駒、方位磁石、ロードマップなどの比喩的ビジュアル。ダークネイビー基調。16:9横長。高品質。"},
+        {"position": paragraphs[total//4][:25] if total > 4 else "", "chart_type": "bar_chart",
+         "description": "主要銘柄・指数の比較",
+         "prompt_ja": "横棒グラフ。記事に登場する銘柄・指数の変動率を比較。プラスはゴールド、マイナスはネイビー。日本語。白背景。金融メディア風。"},
+        {"position": paragraphs[total//2][:25] if total > 2 else "", "chart_type": "comparison_table",
+         "description": "主要データ比較表",
+         "prompt_ja": "シンプルな比較表。記事の主要な数値データを整理。ヘッダーはダークブルー背景に白文字。日本語。読みやすいフォント。"},
+        {"position": paragraphs[total*3//4][:25] if total > 3 else "", "chart_type": "infographic",
+         "description": "今日の投資ポイント",
+         "prompt_ja": "縦型インフォグラフィック。本日の3大投資ポイントをアイコン付きで視覚的に整理。ダークネイビー背景にゴールド・ホワイトのテキスト。日本語。"},
     ]
 
 
@@ -170,38 +168,33 @@ _CHART_TYPE_GUIDE = {
     "infographic":      "インフォグラフィック。複数の情報をビジュアルで整理。アイコンや矢印を活用。",
     "flowchart":        "フローチャート。因果関係・プロセスの流れを矢印で表現。",
     "concept_diagram":  "概念図。複雑な仕組みや構造を図解で説明。",
-    "image":            "テーマに合ったイメージ画像。写真風またはイラスト風。記事の内容を視覚的に象徴するビジュアル。",
 }
 
 
-def generate_chart_image(section: dict, index: int) -> str | None:
-    """Gemini 3で記事文脈に合った画像を生成"""
-    desc = section.get("description", f"画像{index+1}")
+def generate_chart_image(section: dict, index: int, article_context: str = "") -> str | None:
+    """Gemini 3で図表・説明画像を生成"""
+    desc = section.get("description", f"図表{index+1}")
     prompt_ja = section.get("prompt_ja", desc)
-    chart_type = section.get("chart_type", "image")
+    chart_type = section.get("chart_type", "infographic")
     type_guide = _CHART_TYPE_GUIDE.get(chart_type, "")
-    context = section.get("context", "")
-    why = section.get("why", "")
 
-    full_prompt = f"""日本の投資ブログ記事（note.com掲載）に挿入する画像を作成してください。
+    context_block = f"\n【記事の関連箇所（必ずこの内容を画像に反映すること）】\n{article_context[:600]}\n" if article_context else ""
 
-【この画像の目的】
-{why}
-
-【この画像が挿入される箇所の記事文脈】
-{context}
-
+    full_prompt = f"""日本の投資ブログ記事（note.com掲載）用の画像を作成してください。
+{context_block}
 【画像タイプ】{chart_type} — {type_guide}
-【画像タイトル】{desc}
-【詳細な画像生成指示】
+【タイトル】{desc}
+【詳細指示】
 {prompt_ja}
 
-【デザイン要件】
-- 16:9横長（1280×720以上）、高解像度
-- プロフェッショナルな金融・投資メディアに適した品質
-- グラフ・表の場合：テキスト・ラベル・数値はすべて日本語。記事中の実際の数値を正確に使う
-- イメージ画像の場合：記事の文脈に合った具体的なシーン。汎用的なストック画像感を避ける
-- 読者が「この画像があって理解が深まった」と感じるクオリティ
+【必須デザイン要件】
+- テキスト・ラベル・凡例・数値は**すべて日本語**で記載
+- 日本語フォントを使用（ゴシック体推奨）
+- プロフェッショナルな金融・投資メディアに適したデザイン
+- 16:9横長（note記事幅に最適）
+- 高解像度・鮮明・読みやすい
+- 情報が整理されていてひと目で要点が伝わる
+- グラフ・表の場合は適切なグリッド・ボーダーを含める
 """
 
     path = f"output/images/chart_{index}.png"
@@ -217,20 +210,25 @@ def insert_images_into_article(article_text: str, sections: list[dict], image_pa
         if not path:
             continue
         pos_hint = section.get("position", "")
-        placeholder = f"\n__IMAGE_{i}__\n"
+        # スペースが大量に入らないようにプレースホルダーは段落境界に合わせて挿入
+        placeholder = f"\n\n__IMAGE_{i}__\n\n"
 
         idx = result.find(pos_hint) if pos_hint else -1
         if idx != -1:
-            result = result[:idx] + placeholder + result[idx:]
+            # 直前の \n\n を除去してから挿入（二重スペース防止）
+            prefix = result[:idx].rstrip("\n")
+            result = prefix + placeholder + result[idx:]
         else:
             paragraphs = result.split("\n\n")
             total = len(paragraphs)
             n = len(sections)
             insert_at = min(int(total * (i + 1) / (n + 1)), total - 1)
-            paragraphs.insert(insert_at, placeholder.strip())
+            paragraphs.insert(insert_at, f"__IMAGE_{i}__")
             result = "\n\n".join(paragraphs)
         inserted += 1
 
+    # 3連続以上の改行を2連続に圧縮
+    result = re.sub(r'\n{3,}', '\n\n', result)
     print(f"  本文画像 {inserted} 枚のプレースホルダーを挿入")
     return result
 
@@ -264,7 +262,20 @@ def main():
     image_paths = []
     for i, section in enumerate(sections):
         print(f"  [{i+1}/{len(sections)}] {section.get('description', '')} 生成中...")
-        path = generate_chart_image(section, i)
+        # 挿入位置の周辺テキストをコンテキストとして渡す（画像が記事内容に即したものになるよう）
+        pos_hint = section.get("position", "")
+        context = ""
+        if pos_hint:
+            idx = article_text.find(pos_hint)
+            if idx != -1:
+                context = article_text[max(0, idx - 200):idx + 600]
+        if not context:
+            # フォールバック：記事全体の該当セクション付近
+            paragraphs = [p for p in article_text.split("\n\n") if len(p.strip()) > 30]
+            n = len(paragraphs)
+            fallback_idx = min(int(n * (i + 1) / (len(sections) + 1)), n - 1)
+            context = paragraphs[fallback_idx] if paragraphs else article_text[:600]
+        path = generate_chart_image(section, i, article_context=context)
         image_paths.append(path)
 
     article_with_images = insert_images_into_article(article_text, sections, image_paths)

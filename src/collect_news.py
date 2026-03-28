@@ -304,11 +304,17 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summar
         for i, a in enumerate(articles)
     )
 
-    history_block = f"\n【過去に書いた記事テーマ（これらと重複するテーマは避けること）】\n{history_summary}\n" if history_summary and history_summary != "（過去記事なし）" else ""
+    history_block = f"\n【過去に書いた記事テーマ（直近3日以内に扱ったテーマは絶対に避けること）】\n{history_summary}\n" if history_summary and history_summary != "（過去記事なし）" else ""
 
     prompt = f"""あなたはプロの投資アナリストです。
 以下のニュース一覧から、**本日の投資家にとって深く掘り下げる価値のある記事を{top_n}本**選んでください。
 {history_block}
+【重複回避ルール（最重要）】
+- 過去に扱ったテーマ・セクター・銘柄と同じものは選ばないこと
+- 特に「石油」「原油」「エネルギー」「OIL」「WTI」「OPEC」に関するニュースは過去3日以内に扱っている場合は絶対に選ばないこと
+- 同じセクター（例：エネルギー、半導体、銀行）が連日になる場合は他のセクターを優先すること
+- 「なんとなく重要そう」ではなく「過去記事と被らない新鮮なテーマ」を最優先で選ぶこと
+
 【選定基準（重要度順）】
 1. **具体性・固有性が高い**：特定企業・特定セクター・特定政策・特定指標に関するニュース
    - 良い例：「NVIDIAが新GPU発表、データセンター向け需要が〜」「FRBのパウエル議長が〜と発言」「日本の春闘で〜%の賃上げ妥結」
@@ -319,7 +325,7 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summar
 
 3. **日本人投資家に関連性がある**：日本株・円・日本企業・日本の経済政策に絡むものを優先
 
-4. **3本の記事が互いに異なるテーマ**：同じ日に同じ話題ばかりにならないよう多様性を確保
+4. **選んだ{top_n}本が互いに異なるセクター・テーマ**：同じ日に同じ話題ばかりにならないよう多様性を確保
 
 【ニュース一覧】
 {article_list}

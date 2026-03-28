@@ -41,7 +41,21 @@ def build_history_summary(history: list[dict], max_entries: int = 30) -> str:
         date = h.get("date", "")
         topics = h.get("topics", [])
         keywords = h.get("keywords", [])
-        lines.append(f"- {date}：{', '.join(topics)}（キーワード：{', '.join(keywords[:5])}）")
+        news_titles = h.get("news_titles", [])
+
+        # topics が空なら news_titles からフォールバック
+        if topics:
+            topic_str = "、".join(topics)
+        elif news_titles:
+            topic_str = " / ".join(t[:50] for t in news_titles[:3])
+        else:
+            topic_str = "（詳細不明）"
+
+        keyword_str = "、".join(keywords[:5]) if keywords else ""
+        line = f"- {date}：{topic_str}"
+        if keyword_str:
+            line += f"（キーワード：{keyword_str}）"
+        lines.append(line)
     return "\n".join(lines)
 
 

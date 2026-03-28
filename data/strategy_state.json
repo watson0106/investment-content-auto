@@ -44,5 +44,13 @@
     "金"
   ],
   "recommended_title_style": "疑問形+数字（例：「2026年のNISAはまだS&P 500だけで大丈」）",
-  "avoid_topics": []
+  "avoid_topics": [],
+  "paid_article_history": [
+    {
+      "date": "2026-03-26",
+      "title": "【有料版】新聞よりわかりやすくて早い今日の投資ニュース速報",
+      "note_key": "n4a5a232f6282",
+      "price": 500
+    }
+  ]
 }
