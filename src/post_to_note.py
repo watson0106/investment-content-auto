@@ -282,7 +282,7 @@ def insert_url_as_embed(driver, url: str):
         document.activeElement.dispatchEvent(ev);
     """, url)
     time.sleep(2.0)  # 埋め込みポップアップの出現を待つ
-    # 「埋め込む」ボタンが出たらクリック
+    # 「埋め込む」ボタンが出たらクリック（出なければ何もしない・裸のURLは挿入しない）
     try:
         from selenium.webdriver.common.by import By
         embed_btn = driver.find_element(
@@ -291,13 +291,8 @@ def insert_url_as_embed(driver, url: str):
         )
         embed_btn.click()
         time.sleep(1.5)
-        return
     except Exception:
         pass
-    # フォールバック: プレーンテキストで挿入
-    driver.execute_script(
-        "document.execCommand('insertText', false, arguments[0])", url + '\n'
-    )
 
 
 def insert_section_with_headings(driver, section_text: str):
@@ -342,8 +337,10 @@ def insert_section_with_headings(driver, section_text: str):
             driver.execute_script("document.execCommand('formatBlock', false, 'p')")
             time.sleep(0.1)
             skip_leading_blanks = True  # 見出し直後の空行をスキップ
-        # URL単独行 → スキップ（URLは記事に含めない）
+        # URL単独行 → 埋め込みカード
         elif re.match(r'^https?://\S+$', line.strip()):
+            flush_batch()
+            insert_url_as_embed(driver, line.strip())
             skip_leading_blanks = False
         else:
             # 見出し直後の空行はスキップ（スペース過多を防ぐ）
