@@ -24,6 +24,9 @@ NOTE_PASSWORD = os.environ["NOTE_PASSWORD"]
 # デフォルトタグ（固定5つ）。記事ごとのtopic_tagsが加わり計7つになる。
 NOTE_TAGS_DEFAULT = ["投資", "株式投資", "資産運用", "米国株", "日本株"]
 
+# 有料マガジンURL（埋め込みカードとして単独行に挿入するため、本文中の重複を除去する）
+MAGAZINE_URL = "https://note.com/kawasewatson0106/m/me3bdb7d529fc"
+
 _IS_CI = bool(os.environ.get("GITHUB_ACTIONS"))
 
 
@@ -311,9 +314,12 @@ def insert_section_with_headings(driver, section_text: str):
             batch.pop()
         if not batch:
             return
+        text = '\n'.join(batch)
+        # 連続空行（\n\n以上）を単一改行に圧縮してProseMirrorでの余分なスペースを防ぐ
+        text = re.sub(r'\n{2,}', '\n', text)
         driver.execute_script(
             "document.execCommand('insertText', false, arguments[0])",
-            '\n'.join(batch) + '\n'
+            text + '\n'
         )
         batch.clear()
 
@@ -346,7 +352,11 @@ def insert_section_with_headings(driver, section_text: str):
             if skip_leading_blanks and not line.strip():
                 continue
             skip_leading_blanks = False
-            batch.append(clean_inline_markdown(line))
+            cleaned = clean_inline_markdown(line)
+            # マガジンURLが文中に混入している場合は除去（単独行で埋め込みカードとして表示するため）
+            cleaned = cleaned.replace(MAGAZINE_URL, '').strip()
+            if cleaned:
+                batch.append(cleaned)
 
     flush_batch()
 

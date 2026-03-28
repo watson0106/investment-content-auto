@@ -86,8 +86,12 @@ https://note.com/kawasewatson0106/m/me3bdb7d529fc
   → clean_article() で冒頭の余分なテキストを除去して対処
 - note下書き保存：画像挿入は現状0枚（noteのProseMirrorへの画像挿入が不安定なため）
 - note投稿のH2/H3実装：`##` → h2、`###` → h3（formatBlock で区別）
-- note投稿のH2後スペース：見出し直後の空行を `skip_leading_blanks` フラグでスキップ
+- note投稿のH2/H3後スペース：見出し直後の空行を `skip_leading_blanks` フラグでスキップ
+- note投稿の連続空行：flush_batch()内で `\n{2,}` を単一改行に圧縮（銘柄セクションのスペース過多対策）
 - note埋め込みURL：ClipboardEvent('paste') でペーストイベントを発火 → 「埋め込む」ボタンをクリック → 失敗時はプレーンテキストにフォールバック
+- マガジンURL重複：バッチ内のテキスト行からMAGAZINE_URLを除去（単独行の埋め込みカードと重複しないよう）
+- 補強ロジック：初稿1500字以上なら既存記事を展開（構成保持）、1500字未満なら完全再生成。補強後が短くなった場合は元の記事を採用
+- トピック選定：1記事目（海外マクロ）×2記事目（日本株/個別銘柄）の異なる地域・セクター縛りを強化
 
 ## 技術スタック
 - ニュース収集：feedparser + BeautifulSoup（RSSソース）

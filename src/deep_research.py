@@ -73,7 +73,13 @@ def select_topics(articles: list[dict]) -> tuple[dict, dict]:
         for i, a in enumerate(articles[:20])
     )
     prompt = f"""以下のニュース一覧から、今日の日本の個人投資家にとって最も注目度の高い2つのトピックを選定してください。
-2つは互いに異なるテーマ（同じセクター・銘柄にならないよう）を選ぶこと。
+
+【選定ルール（必ず守ること）】
+- topic1とtopic2は全く異なるテーマ・地域・セクターから選ぶ
+- 理想の組み合わせ例：「米国株/マクロ」×「日本株/為替」、「個別銘柄決算」×「地政学リスク」など
+- 同じ地域（例：米国×米国）・同じセクター（例：半導体×半導体）の組み合わせは禁止
+- 「日本の個人投資家が明日の売買に使える」視点で選ぶ
+- タイトルが具体的で記事化しやすいものを優先（「〇〇が報じた」ではなく実際のニュース内容があるもの）
 
 {news_block}
 
@@ -255,36 +261,61 @@ def write_article(news: dict, article_num: int) -> dict:
         topic_tags = [t.strip() for t in tags_match.group(1).split(',')][:2]
         draft = re.sub(r'TOPIC_TAGS:\s*.+$', '', draft, flags=re.MULTILINE).strip()
 
-    # 4000字未満なら各セクションを補強
+    # 4000字未満なら補強
     if len(draft) < 4000:
         print(f"  [WARN] 記事{article_num}が{len(draft)}文字（4000字未満）→ 補強中...")
-        news_title = news.get('title', '')
-        news_summary = news.get('summary', '')
-        supplement_prompt = f"""以下のニュースを題材に、投資ブログ記事を5000字程度で執筆してください。
+        source = news.get('source', 'メディア')
+
+        if len(draft) >= 1500:
+            # 既存の記事を展開（構成・主張は変えずに加筆）
+            supplement_prompt = f"""以下の投資記事を加筆して5000字程度にしてください。
+
+【加筆ルール】
+- 現在の記事の内容・構成・主張は一切変えない
+- 各セクションに根拠・データ・事例を追記して文字数を増やす
+- 「このニュースで注目すべき銘柄」の銘柄分析に具体的な株価水準・過去の相関・需給データを追加
+- 「おわりに」「今週の注目指標」見出し禁止
+- コメント・まとめ・前置き不要。加筆後の記事全文のみ出力
+
+【現在の記事（{len(draft)}文字）】
+{draft}"""
+            supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=300)
+        else:
+            # 極端に短い場合は完全再生成
+            news_title = news.get('title', '')
+            news_summary = news.get('summary', '')
+            supplement_prompt = f"""以下のニュースを題材に、投資ブログ記事を5000字程度で執筆してください。
 
 【ニュース】
+ソース: {source}
 タイトル: {news_title}
 概要: {news_summary}
 
 【出力ルール】
 - 1行目: TITLE: [記事タイトル]（ニュースの核心を突いた逆説/数字/問い型の30字以内）
-- 本文: リード文 → ## [ソース名]が報じたこと → ## [結論H2] → ## 行動の考え方 → ## このニュースで注目すべき銘柄
-- 銘柄セクション末尾に有料マガジン誘導（{MAGAZINE_URL} を単独行に）
+- 本文: リード文 → ## {source}が報じたこと → ## [結論をそのままH2見出しに] → ## 行動の考え方 → ## このニュースで注目すべき銘柄
+- 「## {source}が報じたこと」は「{source}によると、」という書き出しで800〜1000字
+- 銘柄セクション末尾に有料マガジン誘導文を入れ、最後の行に単独で次のURLを置く：
+{MAGAZINE_URL}
 - 末尾: TOPIC_TAGS: タグ1,タグ2（為替/FRB/金利/決算/マクロ経済/エネルギー/半導体/日銀/円安/円高 から2つ）
-- 「おわりに」「今週の注目指標」見出し禁止
-- コメント・まとめ・前置き不要"""
-        supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=300)
+- 「おわりに」「今週の注目指標」見出し禁止・絵文字禁止
+- コメント・まとめ・前置き不要。記事本文のみ出力"""
+            supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=300)
+            if supplement:
+                s_title_match = re.search(r'^TITLE:\s*(.+)$', supplement, re.MULTILINE)
+                if s_title_match and not title:
+                    title = s_title_match.group(1).strip()
+                    supplement = re.sub(r'^TITLE:\s*.+\n?', '', supplement, count=1, flags=re.MULTILINE).strip()
+                s_tags_match = re.search(r'TOPIC_TAGS:\s*(.+)$', supplement, re.MULTILINE)
+                if s_tags_match and not topic_tags:
+                    topic_tags = [t.strip() for t in s_tags_match.group(1).split(',')][:2]
+                    supplement = re.sub(r'TOPIC_TAGS:\s*.+$', '', supplement, flags=re.MULTILINE).strip()
+
         if supplement:
-            # 新たにTITLE:とTOPIC_TAGS:を抽出
-            s_title_match = re.search(r'^TITLE:\s*(.+)$', supplement, re.MULTILINE)
-            if s_title_match and not title:
-                title = s_title_match.group(1).strip()
-                supplement = re.sub(r'^TITLE:\s*.+\n?', '', supplement, count=1, flags=re.MULTILINE).strip()
-            s_tags_match = re.search(r'TOPIC_TAGS:\s*(.+)$', supplement, re.MULTILINE)
-            if s_tags_match and not topic_tags:
-                topic_tags = [t.strip() for t in s_tags_match.group(1).split(',')][:2]
-                supplement = re.sub(r'TOPIC_TAGS:\s*.+$', '', supplement, flags=re.MULTILINE).strip()
-            draft = clean_article(supplement)
+            expanded = clean_article(supplement)
+            # 補強後が元より長い場合のみ採用
+            if len(expanded) > len(draft):
+                draft = expanded
             print(f"  補強後: {len(draft)} 文字")
 
     draft = clean_article(draft)
