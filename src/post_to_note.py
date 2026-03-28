@@ -342,8 +342,10 @@ def insert_section_with_headings(driver, section_text: str):
             driver.execute_script("document.execCommand('formatBlock', false, 'p')")
             time.sleep(0.1)
             skip_leading_blanks = True  # 見出し直後の空行をスキップ
-        # URL単独行 → スキップ（マガジンURLは記事に含めない）
+        # URL単独行 → 埋め込みカード
         elif re.match(r'^https?://\S+$', line.strip()):
+            flush_batch()
+            insert_url_as_embed(driver, line.strip())
             skip_leading_blanks = False
         else:
             # 見出し直後の空行はスキップ（スペース過多を防ぐ）
