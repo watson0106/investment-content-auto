@@ -345,7 +345,8 @@ def write_article(news: dict, article_num: int) -> dict:
     topic_tags = []
     tags_match = re.search(r'TOPIC_TAGS:\s*(.+)$', draft, re.MULTILINE)
     if tags_match:
-        topic_tags = [t.strip() for t in tags_match.group(1).split(',')][:2]
+        raw = [t.strip() for t in tags_match.group(1).split(',')]
+        topic_tags = [t for t in raw if t in TOPIC_TAGS_OPTIONS][:2]
         draft = re.sub(r'TOPIC_TAGS:\s*.+$', '', draft, flags=re.MULTILINE).strip()
 
     # 4000字未満なら補強
@@ -388,7 +389,7 @@ def write_article(news: dict, article_num: int) -> dict:
 - 末尾: TOPIC_TAGS: タグ1,タグ2（為替/FRB/金利/決算/マクロ経済/エネルギー/半導体/日銀/円安/円高 から2つ）
 - 「おわりに」「今週の注目指標」見出し禁止・絵文字禁止
 - コメント・まとめ・前置き不要。記事本文のみ出力"""
-            supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=300)
+            supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=600)
             if supplement:
                 s_title_match = re.search(r'^TITLE:\s*(.+)$', supplement, re.MULTILINE)
                 if s_title_match and not title:
@@ -396,7 +397,8 @@ def write_article(news: dict, article_num: int) -> dict:
                     supplement = re.sub(r'^TITLE:\s*.+\n?', '', supplement, count=1, flags=re.MULTILINE).strip()
                 s_tags_match = re.search(r'TOPIC_TAGS:\s*(.+)$', supplement, re.MULTILINE)
                 if s_tags_match and not topic_tags:
-                    topic_tags = [t.strip() for t in s_tags_match.group(1).split(',')][:2]
+                    s_raw = [t.strip() for t in s_tags_match.group(1).split(',')]
+                    topic_tags = [t for t in s_raw if t in TOPIC_TAGS_OPTIONS][:2]
                     supplement = re.sub(r'TOPIC_TAGS:\s*.+$', '', supplement, flags=re.MULTILINE).strip()
 
         if supplement:
@@ -420,7 +422,7 @@ def write_article(news: dict, article_num: int) -> dict:
         else:
             title = news['title'][:30]
 
-    all_tags = FIXED_TAGS + topic_tags
+    all_tags = FIXED_TAGS + [t for t in topic_tags if t not in FIXED_TAGS]
 
     return {
         "title": title,
