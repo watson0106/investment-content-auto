@@ -1,23 +1,21 @@
 """
 ① ニュース収集・ピックアップ
 Bloomberg・日経（Nikkei Asia）・ロイター（スクレイピング）・Yahoo Finance・note の
-リアルタイム情報を収集し、Gemini で最も注目度の高い記事を選定する
+リアルタイム情報を収集し、Claude Sonnet で最も注目度の高い記事を選定する
 """
 
 from __future__ import annotations
 
 import feedparser
 import requests
+import subprocess
+import os
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 import json
 import re
-import os
-from google import genai
-from google.genai import types
 
 JST = timezone(timedelta(hours=9))
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 HEADERS = {
     "User-Agent": (
@@ -292,10 +290,8 @@ def interleave_by_source(articles: list[dict]) -> list[dict]:
     return result
 
 
-def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summary: str = "") -> list[dict]:
-    """Gemini で投資家にとって最も注目度の高い記事を選定"""
-    client = genai.Client(api_key=GEMINI_API_KEY)
-
+def select_top_with_claude(articles: list[dict], top_n: int = 10, history_summary: str = "") -> list[dict]:
+    """Claude Sonnet で投資家にとって最も注目度の高い記事を選定"""
     # ソースごとにインターリーブして順番の偏りをなくす
     articles = interleave_by_source(articles)
 
@@ -334,27 +330,39 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summar
 番号のみ、JSONのみ、説明不要。"""
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-pro",
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=256),
+        claude_cmd = None
+        for candidate in ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"]:
+            if os.path.exists(candidate):
+                claude_cmd = candidate
+                break
+        if claude_cmd is None:
+            r = subprocess.run(["which", "claude"], capture_output=True, text=True)
+            claude_cmd = r.stdout.strip() if r.returncode == 0 else None
+        if not claude_cmd:
+            return articles[:top_n]
+
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+        result = subprocess.run(
+            [claude_cmd, "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6"],
+            capture_output=True, text=True, timeout=60, env=env,
         )
-        text = response.text.strip()
-        match = re.search(r"\[[\d,\s]+\]", text)
-        if match:
-            indices = json.loads(match.group())
-            selected = [articles[i - 1] for i in indices if 1 <= i <= len(articles)]
-            if selected:
-                print(f"  Gemini 選定: {len(selected)} 件")
-                return selected[:top_n]
+        if result.returncode == 0:
+            text = result.stdout.strip()
+            match = re.search(r"\[[\d,\s]+\]", text)
+            if match:
+                indices = json.loads(match.group())
+                selected = [articles[i - 1] for i in indices if 1 <= i <= len(articles)]
+                if selected:
+                    print(f"  Claude 選定: {len(selected)} 件")
+                    return selected[:top_n]
     except Exception as e:
-        print(f"  [WARN] Gemini 選定失敗: {e}")
+        print(f"  [WARN] Claude 選定失敗: {e}")
 
     return articles[:top_n]
 
 
 def collect_and_rank(top_n: int = 10, history_summary: str = "") -> list[dict]:
-    """全ソースからニュースを収集して Gemini で選定"""
+    """全ソースからニュースを収集して Claude で選定"""
     all_articles = []
 
     # RSS フィード
@@ -385,9 +393,9 @@ def collect_and_rank(top_n: int = 10, history_summary: str = "") -> list[dict]:
     unique = deduplicate(all_articles)
     print(f"  重複除去後: {len(unique)} 件")
 
-    # Gemini で注目度選定
-    print("  Gemini で注目度分析・選定中...")
-    return select_top_with_gemini(unique, top_n=top_n, history_summary=history_summary)
+    # Claude で注目度選定
+    print("  Claude で注目度分析・選定中...")
+    return select_top_with_claude(unique, top_n=top_n, history_summary=history_summary)
 
 
 def main():

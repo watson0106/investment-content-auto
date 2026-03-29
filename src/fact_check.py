@@ -28,20 +28,12 @@ def strip_reference_section(text: str) -> str:
 
 
 def auto_proofread(text: str) -> str:
-    """Geminiで記事を自動校正（年数ミス・時制矛盾・AI感のある定型表現を修正）"""
-    try:
-        from google import genai
-        from google.genai import types
-        GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-    except Exception as e:
-        print(f"  [WARN] 自動校正スキップ（Gemini未設定）: {e}")
-        return text
+    """Claude Sonnetで記事を自動校正（年数ミス・時制矛盾・AI感のある定型表現を修正）"""
+    import subprocess
 
     today = datetime.now(JST)
     current_year = today.year
-    current_month = today.month
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
     prompt = f"""以下の投資ブログ記事を校正してください。
 
 【現在日時】{today.strftime('%Y年%m月%d日')}（これを基準に全ての時制・年数を判断すること）
@@ -74,18 +66,30 @@ def auto_proofread(text: str) -> str:
 - 出力の最初の文字は必ず記事の最初の文字から始めること"""
 
     try:
-        resp = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=12000),
+        claude_cmd = None
+        for candidate in ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"]:
+            if os.path.exists(candidate):
+                claude_cmd = candidate
+                break
+        if claude_cmd is None:
+            r = subprocess.run(["which", "claude"], capture_output=True, text=True)
+            claude_cmd = r.stdout.strip() if r.returncode == 0 else None
+        if not claude_cmd:
+            print("  [WARN] 自動校正スキップ（Claude CLI未設定）")
+            return text
+
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+        result = subprocess.run(
+            [claude_cmd, "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6"],
+            capture_output=True, text=True, timeout=120, env=env,
         )
-        result = resp.text.strip()
-        # 極端に短くなった場合は元を使う（安全弁）
-        if result and len(result) >= len(text) * 0.7:
-            print(f"  自動校正完了（{len(text)} → {len(result)} 文字）")
-            return result
-        else:
-            print(f"  [WARN] 自動校正の出力が短すぎるため原文を使用")
+        if result.returncode == 0:
+            proofread = result.stdout.strip()
+            if proofread and len(proofread) >= len(text) * 0.7:
+                print(f"  自動校正完了（{len(text)} → {len(proofread)} 文字）")
+                return proofread
+            else:
+                print(f"  [WARN] 自動校正の出力が短すぎるため原文を使用")
     except Exception as e:
         print(f"  [WARN] 自動校正エラー: {e}")
 

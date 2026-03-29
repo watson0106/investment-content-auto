@@ -14,7 +14,6 @@ import re
 import subprocess
 import datetime
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 MAGAZINE_URL = "https://note.com/kawasewatson0106/m/me3bdb7d529fc"
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
@@ -57,24 +56,6 @@ def run_claude(prompt: str, model: str = "claude-opus-4-6", timeout: int = 600) 
     print(f"  [WARN] Claude CLI 失敗: {result.stderr[:200]}")
     return ""
 
-
-def run_gemini(prompt: str) -> str:
-    """Geminiフォールバック"""
-    if not GEMINI_API_KEY:
-        return ""
-    try:
-        from google import genai
-        from google.genai import types
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.7, max_output_tokens=16000),
-        )
-        return response.text or ""
-    except Exception as e:
-        print(f"  [WARN] Gemini 失敗: {e}")
-        return ""
 
 
 def get_realtime_price(code: str, is_jp: bool = True) -> str | None:
@@ -335,10 +316,6 @@ def write_article(news: dict, article_num: int) -> dict:
 
     print(f"  Claude CLI で記事{article_num}執筆中...")
     draft = run_claude(prompt, model="claude-opus-4-6", timeout=600)
-
-    if not draft:
-        print(f"  Gemini で記事{article_num}執筆中（フォールバック）...")
-        draft = run_gemini(prompt)
 
     if not draft:
         raise RuntimeError(f"記事{article_num}の執筆に失敗しました")
