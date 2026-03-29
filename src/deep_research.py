@@ -77,6 +77,111 @@ def get_realtime_price(code: str, is_jp: bool = True) -> str | None:
         return None
 
 
+def generate_stock_chart(code: str, is_jp: bool = True) -> str | None:
+    """1ヶ月の株価チャートを生成してPNGパスを返す"""
+    try:
+        import yfinance as yf
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        plt.rcParams['font.family'] = ['Hiragino Sans', 'Hiragino Maru Gothic Pro', 'sans-serif']
+
+        ticker_str = f"{code}.T" if is_jp else code
+        df = yf.Ticker(ticker_str).history(period="1mo")
+        if df.empty or len(df) < 5:
+            return None
+
+        os.makedirs("output/charts", exist_ok=True)
+
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, figsize=(10, 5.5),
+            gridspec_kw={'height_ratios': [3, 1]},
+            facecolor='#1a1a2e'
+        )
+
+        ax1.plot(df.index, df['Close'], color='#00d4ff', linewidth=2, label='終値')
+        if len(df) >= 5:
+            ax1.plot(df.index, df['Close'].rolling(5).mean(),
+                     color='#ffa500', linewidth=1, linestyle='--', label='MA5', alpha=0.8)
+        if len(df) >= 20:
+            ax1.plot(df.index, df['Close'].rolling(20).mean(),
+                     color='#ff69b4', linewidth=1, linestyle='--', label='MA20', alpha=0.8)
+
+        ax1.set_facecolor('#1a1a2e')
+        ax1.tick_params(colors='#aaaaaa', labelsize=8)
+        for spine in ax1.spines.values():
+            spine.set_color('#333355')
+        ax1.legend(loc='upper left', fontsize=7, facecolor='#1a1a2e', labelcolor='white', framealpha=0.5)
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+        plt.setp(ax1.xaxis.get_majorticklabels(), rotation=0)
+
+        bar_colors = ['#ff4444' if c < o else '#44cc66'
+                      for c, o in zip(df['Close'], df['Open'])]
+        ax2.bar(df.index, df['Volume'], color=bar_colors, alpha=0.7)
+        ax2.set_facecolor('#1a1a2e')
+        ax2.tick_params(colors='#aaaaaa', labelsize=7)
+        for spine in ax2.spines.values():
+            spine.set_color('#333355')
+        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e6:.1f}M' if x >= 1e6 else f'{x/1e3:.0f}K'))
+
+        label = f"{code}（東証）" if is_jp else code
+        fig.suptitle(f"{label}  直近1ヶ月", color='white', fontsize=11, y=1.01)
+        plt.tight_layout()
+
+        chart_path = f"output/charts/{code}_chart.png"
+        plt.savefig(chart_path, dpi=120, bbox_inches='tight', facecolor='#1a1a2e')
+        plt.close(fig)
+        print(f"  チャート生成: {chart_path}")
+        return chart_path
+    except Exception as e:
+        print(f"  [WARN] チャート生成失敗 {code}: {e}")
+        return None
+
+
+def inject_stock_charts(draft: str) -> tuple[str, list[str]]:
+    """銘柄セクションのH3直下に株価チャートの__IMAGE_X__マーカーを挿入する"""
+    # 「## このニュースで注目すべき銘柄」以降だけを対象にする
+    section_match = re.search(r'(## このニュースで注目すべき銘柄.*)', draft, re.DOTALL)
+    if not section_match:
+        return draft, []
+
+    image_paths = []
+    lines = draft.split('\n')
+    new_lines = []
+    img_idx = 0
+
+    for i, line in enumerate(lines):
+        new_lines.append(line)
+        # H3の銘柄見出しを検出（例：### トヨタ自動車（7203）/ ### NVDA）
+        h3_match = re.match(r'^###\s+.+', line)
+        if not h3_match:
+            continue
+
+        # 銘柄コードを抽出
+        jp_match = re.search(r'[（(](\d{4})[）)]', line)
+        us_match = re.search(r'\b([A-Z]{2,5})\b', line)
+        noise = {"AI", "FRB", "SOX", "ETF", "ADR", "CEO", "GDP", "USD", "JPY", "BOJ", "FED"}
+
+        code, is_jp = None, True
+        if jp_match:
+            code, is_jp = jp_match.group(1), True
+        elif us_match and us_match.group(1) not in noise:
+            code, is_jp = us_match.group(1), False
+
+        if not code:
+            continue
+
+        chart_path = generate_stock_chart(code, is_jp)
+        if chart_path:
+            # 株価行（直近終値：の行）の直後にマーカーを挿入
+            new_lines.append(f'__IMAGE_{img_idx}__')
+            image_paths.append(chart_path)
+            img_idx += 1
+
+    return '\n'.join(new_lines), image_paths
+
+
 def inject_realtime_prices(draft: str) -> str:
     """記事内の銘柄コードをもとにリアルタイム株価を取得してClaudeで注入する"""
     # 日本株コード（4桁数字） 例：（8035）
@@ -402,6 +507,10 @@ def write_article(news: dict, article_num: int) -> dict:
     print(f"  リアルタイム株価を取得・注入中...")
     draft = inject_realtime_prices(draft)
 
+    # 銘柄チャートを生成してマーカーを挿入
+    print(f"  銘柄チャートを生成中...")
+    draft, image_paths = inject_stock_charts(draft)
+
     # タイトルが抽出できなかった場合は本文H2から取得
     if not title:
         first_h2 = re.search(r'^##\s+(.+)$', draft, re.MULTILINE)
@@ -418,7 +527,7 @@ def write_article(news: dict, article_num: int) -> dict:
         "tags": all_tags,
         "topic_tags": topic_tags,
         "source_news": news,
-        "image_paths": [],
+        "image_paths": image_paths,
         "cover_path": None,
     }
 
