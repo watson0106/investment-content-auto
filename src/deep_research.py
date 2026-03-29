@@ -34,11 +34,20 @@ def clean_article(text: str) -> str:
 def run_claude(prompt: str, model: str = "claude-opus-4-6", timeout: int = 600) -> str:
     """Claude CLIを呼び出してテキストを返す"""
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-    claude_available = subprocess.run(["which", "claude"], capture_output=True).returncode == 0
-    if not claude_available:
+    # cronはPATHが最小限のため絶対パスを優先して探す
+    claude_cmd = None
+    for candidate in ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"]:
+        if os.path.exists(candidate):
+            claude_cmd = candidate
+            break
+    if claude_cmd is None:
+        result = subprocess.run(["which", "claude"], capture_output=True, text=True)
+        claude_cmd = result.stdout.strip() if result.returncode == 0 else None
+    if not claude_cmd:
+        print("  [WARN] Claude CLI が見つかりません")
         return ""
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "text", "--model", model],
+        [claude_cmd, "-p", prompt, "--output-format", "text", "--model", model],
         capture_output=True, text=True, timeout=timeout, env=env,
     )
     if result.returncode == 0 and result.stdout.strip():
