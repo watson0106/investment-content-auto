@@ -12,9 +12,11 @@ import json
 import os
 import re
 import subprocess
+import datetime
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 MAGAZINE_URL = "https://note.com/kawasewatson0106/m/me3bdb7d529fc"
+JST = datetime.timezone(datetime.timedelta(hours=9))
 
 FIXED_TAGS = ["投資", "株式投資", "資産運用", "米国株", "日本株"]
 TOPIC_TAGS_OPTIONS = ["為替", "FRB", "金利", "決算", "マクロ経済", "エネルギー", "半導体", "日銀", "円安", "円高"]
@@ -73,6 +75,80 @@ def run_gemini(prompt: str) -> str:
     except Exception as e:
         print(f"  [WARN] Gemini 失敗: {e}")
         return ""
+
+
+def get_realtime_price(code: str, is_jp: bool = True) -> str | None:
+    """yfinanceでリアルタイム株価を取得して文字列で返す"""
+    try:
+        import yfinance as yf
+        ticker_str = f"{code}.T" if is_jp else code
+        ticker = yf.Ticker(ticker_str)
+        hist = ticker.history(period="2d")
+        if hist.empty:
+            return None
+        price = hist["Close"].iloc[-1]
+        if is_jp:
+            return f"{price:,.0f}円"
+        else:
+            return f"${price:,.2f}"
+    except Exception as e:
+        print(f"  [WARN] 株価取得失敗 {code}: {e}")
+        return None
+
+
+def inject_realtime_prices(draft: str) -> str:
+    """記事内の銘柄コードをもとにリアルタイム株価を取得してClaudeで注入する"""
+    # 日本株コード（4桁数字） 例：（8035）
+    jp_codes = list(dict.fromkeys(re.findall(r'[（(](\d{4})[）)]', draft)))
+    # 米国株ティッカー（大文字2〜5字） 例：NVDA、META、AAPL
+    us_tickers = list(dict.fromkeys(re.findall(r'\b([A-Z]{2,5})\b', draft)))
+    # 一般的な英単語を除外
+    noise = {"AI", "FRB", "SOX", "ETF", "ADR", "GDP", "CPI", "BOJ", "USD", "JPY",
+             "WTI", "PER", "PBR", "CFD", "ROE", "HBM", "DMA", "EV", "VIX", "PCR",
+             "HBA", "PBR", "EPS", "M2", "PE", "QE", "US", "EU", "UK", "JP"}
+    us_tickers = [t for t in us_tickers if t not in noise][:5]
+
+    price_lines = []
+    today = datetime.datetime.now(JST)
+    is_weekend = today.weekday() >= 5
+
+    for code in jp_codes[:3]:
+        price = get_realtime_price(code, is_jp=True)
+        if price:
+            label = f"週明け注目水準（直近終値）：{price}" if is_weekend else f"直近終値：{price}"
+            price_lines.append(f"  {code}（東証）: {label}")
+
+    for ticker in us_tickers:
+        price = get_realtime_price(ticker, is_jp=False)
+        if price:
+            price_lines.append(f"  {ticker}（米国）: 直近終値 {price}")
+
+    if not price_lines:
+        print("  [INFO] リアルタイム株価取得なし（銘柄コード未検出 or 取得失敗）")
+        return draft
+
+    price_block = "\n".join(price_lines)
+    print(f"  リアルタイム株価取得:\n{price_block}")
+
+    update_prompt = f"""以下の投資記事の株価表記を、提供したリアルタイム株価データに更新してください。
+
+【リアルタイム株価データ（{today.strftime('%Y年%m月%d日')}時点の直近終値）】
+{price_block}
+
+【更新ルール】
+- 「本日の株価：〇〇円前後」「週明けの注目水準：〇〇円前後」などの株価表記を実際の数値に更新
+- 株価以外の内容・構成・主張は一切変えない
+- コメント・前置き不要。更新後の記事本文のみ出力
+
+【記事】
+{draft}"""
+
+    updated = run_claude(update_prompt, model="claude-sonnet-4-6", timeout=120)
+    if updated and len(updated) >= len(draft) * 0.7:
+        print(f"  株価注入完了（{len(draft)} → {len(updated)} 文字）")
+        return clean_article(updated)
+    print("  [WARN] 株価注入失敗、元の記事を使用")
+    return draft
 
 
 def select_topics(articles: list[dict]) -> tuple[dict, dict]:
@@ -331,6 +407,10 @@ def write_article(news: dict, article_num: int) -> dict:
             print(f"  補強後: {len(draft)} 文字")
 
     draft = clean_article(draft)
+
+    # リアルタイム株価を注入
+    print(f"  リアルタイム株価を取得・注入中...")
+    draft = inject_realtime_prices(draft)
 
     # タイトルが抽出できなかった場合は本文H2から取得
     if not title:
