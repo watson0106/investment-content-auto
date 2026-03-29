@@ -78,13 +78,13 @@ def get_realtime_price(code: str, is_jp: bool = True) -> str | None:
 
 
 def generate_stock_chart(code: str, is_jp: bool = True) -> str | None:
-    """1ヶ月の株価チャートを生成してPNGパスを返す"""
+    """1ヶ月のローソク足チャートを生成してPNGパスを返す"""
     try:
         import yfinance as yf
+        import mplfinance as mpf
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
-        import matplotlib.dates as mdates
         plt.rcParams['font.family'] = ['Hiragino Sans', 'Hiragino Maru Gothic Pro', 'sans-serif']
 
         ticker_str = f"{code}.T" if is_jp else code
@@ -92,45 +92,58 @@ def generate_stock_chart(code: str, is_jp: bool = True) -> str | None:
         if df.empty or len(df) < 5:
             return None
 
+        # mplfinanceはtz-naiveなインデックスを要求
+        df.index = df.index.tz_localize(None)
+
         os.makedirs("output/charts", exist_ok=True)
-
-        fig, (ax1, ax2) = plt.subplots(
-            2, 1, figsize=(10, 5.5),
-            gridspec_kw={'height_ratios': [3, 1]},
-            facecolor='#1a1a2e'
-        )
-
-        ax1.plot(df.index, df['Close'], color='#00d4ff', linewidth=2, label='終値')
-        if len(df) >= 5:
-            ax1.plot(df.index, df['Close'].rolling(5).mean(),
-                     color='#ffa500', linewidth=1, linestyle='--', label='MA5', alpha=0.8)
-        if len(df) >= 20:
-            ax1.plot(df.index, df['Close'].rolling(20).mean(),
-                     color='#ff69b4', linewidth=1, linestyle='--', label='MA20', alpha=0.8)
-
-        ax1.set_facecolor('#1a1a2e')
-        ax1.tick_params(colors='#aaaaaa', labelsize=8)
-        for spine in ax1.spines.values():
-            spine.set_color('#333355')
-        ax1.legend(loc='upper left', fontsize=7, facecolor='#1a1a2e', labelcolor='white', framealpha=0.5)
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-        plt.setp(ax1.xaxis.get_majorticklabels(), rotation=0)
-
-        bar_colors = ['#ff4444' if c < o else '#44cc66'
-                      for c, o in zip(df['Close'], df['Open'])]
-        ax2.bar(df.index, df['Volume'], color=bar_colors, alpha=0.7)
-        ax2.set_facecolor('#1a1a2e')
-        ax2.tick_params(colors='#aaaaaa', labelsize=7)
-        for spine in ax2.spines.values():
-            spine.set_color('#333355')
-        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e6:.1f}M' if x >= 1e6 else f'{x/1e3:.0f}K'))
+        chart_path = f"output/charts/{code}_chart.png"
 
         label = f"{code}（東証）" if is_jp else code
-        fig.suptitle(f"{label}  直近1ヶ月", color='white', fontsize=11, y=1.01)
-        plt.tight_layout()
 
-        chart_path = f"output/charts/{code}_chart.png"
-        plt.savefig(chart_path, dpi=120, bbox_inches='tight', facecolor='#1a1a2e')
+        # 移動平均
+        add_plots = []
+        if len(df) >= 5:
+            add_plots.append(mpf.make_addplot(df['Close'].rolling(5).mean(),
+                                              color='#ffa500', width=1.2))
+        if len(df) >= 20:
+            add_plots.append(mpf.make_addplot(df['Close'].rolling(20).mean(),
+                                              color='#ff69b4', width=1.2))
+
+        mc = mpf.make_marketcolors(
+            up='#44cc66', down='#ff4444',
+            edge='inherit',
+            wick={'up': '#44cc66', 'down': '#ff4444'},
+            volume={'up': '#44cc66', 'down': '#ff4444'},
+        )
+        s = mpf.make_mpf_style(
+            marketcolors=mc,
+            facecolor='#1a1a2e',
+            edgecolor='#333355',
+            figcolor='#1a1a2e',
+            gridcolor='#333355',
+            gridstyle='--',
+            rc={'font.family': ['Hiragino Sans', 'sans-serif'],
+                'axes.labelcolor': '#aaaaaa',
+                'xtick.color': '#aaaaaa',
+                'ytick.color': '#aaaaaa',
+                'text.color': 'white'},
+        )
+
+        fig, axes = mpf.plot(
+            df,
+            type='candle',
+            style=s,
+            title=f"\n{label}  直近1ヶ月",
+            volume=True,
+            addplot=add_plots if add_plots else None,
+            figsize=(10, 5.5),
+            returnfig=True,
+            tight_layout=True,
+        )
+        axes[0].title.set_color('white')
+        axes[0].title.set_fontsize(11)
+
+        fig.savefig(chart_path, dpi=120, bbox_inches='tight', facecolor='#1a1a2e')
         plt.close(fig)
         print(f"  チャート生成: {chart_path}")
         return chart_path
@@ -158,8 +171,8 @@ def inject_stock_charts(draft: str) -> tuple[str, list[str]]:
         if not h3_match:
             continue
 
-        # 銘柄コードを抽出
-        jp_match = re.search(r'[（(](\d{4})[）)]', line)
+        # 銘柄コードを抽出（285Aなど英数混在も対応）
+        jp_match = re.search(r'[（(](\d{3,4}[A-Z]?)[）)]', line)
         us_match = re.search(r'\b([A-Z]{2,5})\b', line)
         noise = {"AI", "FRB", "SOX", "ETF", "ADR", "CEO", "GDP", "USD", "JPY", "BOJ", "FED"}
 
@@ -184,8 +197,8 @@ def inject_stock_charts(draft: str) -> tuple[str, list[str]]:
 
 def inject_realtime_prices(draft: str) -> str:
     """記事内の銘柄コードをもとにリアルタイム株価を取得してClaudeで注入する"""
-    # 日本株コード（4桁数字） 例：（8035）
-    jp_codes = list(dict.fromkeys(re.findall(r'[（(](\d{4})[）)]', draft)))
+    # 日本株コード（4桁 or 285Aなど英数混在） 例：（8035）（285A）
+    jp_codes = list(dict.fromkeys(re.findall(r'[（(](\d{3,4}[A-Z]?)[）)]', draft)))
     # 米国株ティッカー（大文字2〜5字） 例：NVDA、META、AAPL
     us_tickers = list(dict.fromkeys(re.findall(r'\b([A-Z]{2,5})\b', draft)))
     # 一般的な英単語を除外
