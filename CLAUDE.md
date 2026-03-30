@@ -14,41 +14,38 @@
 
 ## 進捗状況
 
-### PHASE 1：コード実装 ✅ 完了
-- [x] src/collect_news.py（RSS 13ソース、スコアリング・重複除去）
-- [x] src/deep_research.py（Gemini 2.0 Flash で記事ドラフト生成）
-- [x] src/fact_check.py（Claude Opus でファクトチェック・文体調整）
-- [x] src/generate_images.py（Gemini 画像生成 API で図表挿入）
-- [x] src/generate_title.py（Claude Opus でタイトル10案生成・自動選択）
-- [x] src/post_to_note.py（Selenium で note.com に自動投稿）
+### 現在の構成 ✅
+- **全工程 Claude CLI のみ**（GeminiもAnthropicAPIキーも不使用）
+- Claude CLIはOAuth認証（claude.ai Proアカウント）で動作
+- GitHub ActionsではCLAUDE_CODE_CREDENTIALSシークレットからOAuthトークンを読み込む
+
+### パイプライン構成
+- [x] src/collect_news.py（RSS 13ソース → Claude CLIで選定）
+- [x] src/deep_research.py（Claude Opus 4.6で記事執筆）
+- [x] src/post_to_note.py（JS API方式でnote下書き保存）
 - [x] src/main.py（パイプライン統合エントリポイント）
-- [x] .github/workflows/daily_post.yml（毎日 JST 07:00 自動実行）
+- [x] .github/workflows/daily_post.yml（毎日 JST 05:00 = UTC 20:00）
 
-### PHASE 2：GitHub リポジトリ作成・Secrets 設定
-- [x] GitHubリポジトリ作成（watson0106/investment-content-auto）
-- [ ] GitHub Secrets 設定（GEMINI_API_KEY / ANTHROPIC_API_KEY / NOTE_EMAIL / NOTE_PASSWORD）
-- [ ] 動作確認（workflow_dispatch で手動実行）
-
-### note投稿方式（JS API方式）✅ 動作確認済み
-- SeleniumのDOM操作ではなく内部APIをJS fetchで直接呼び出す方式
-- undetected-chromedriver + headless=false でWAFを回避
-- ログイン: `POST /api/v1/sessions/sign_in`
-- ドラフト作成: `POST /api/v1/text_notes`（editor.note.comドメインから）
-- 記事更新・公開: `PUT /api/v1/text_notes/{id}` with `{name, body, status, hashtag_list}`
-- GitHub Actions: Xvfb仮想ディスプレイで非headless実行
-- ローカルテストでWAFレートリミットに注意（連続アクセスで403）
-
-## 技術スタック
-- ニュース収集：feedparser + BeautifulSoup（13 RSS ソース）
-- 深掘り分析：Gemini 2.5 Flash
-- 添削：Claude Opus 4.6
-- 画像生成：Gemini 3 Pro Image Preview
-- タイトル生成：Claude Opus 4.6
-- 自動投稿：undetected-chromedriver + JS API
-- CI/CD：GitHub Actions（毎日 UTC 22:00 = JST 07:00、Xvfb使用）
-
-## 環境変数（GitHub Secrets に登録）
-- GEMINI_API_KEY = AIzaSyA-J-W8cw_do0mFLvkO_MeZrVgCdPGdBQs
-- ANTHROPIC_API_KEY（Claude CLI のキーを使用）
+### GitHub Secrets（登録済み）
+- CLAUDE_CODE_CREDENTIALS：OAuthトークンJSON（キーチェーンから取得）
 - NOTE_EMAIL = watson19910704@gmail.com
 - NOTE_PASSWORD = ts2164
+- GEMINI_API_KEY：残存しているが未使用
+
+### note投稿方式（JS API方式）✅ 動作確認済み
+- undetected-chromedriver + headless=false でWAFを回避
+- ログイン: `POST /api/v1/sessions/sign_in`
+- ドラフト作成・公開: `PUT /api/v1/text_notes/{id}`
+- GitHub Actions: Xvfb仮想ディスプレイで非headless実行
+
+### GitHub Actions ワークフロー構成
+1. checkout → Python 3.11 → Chrome → Xvfb → pip install
+2. npm install -g @anthropic-ai/claude-code（Claude CLI インストール）
+3. CLAUDE_CODE_CREDENTIALSを ~/.claude/.credentials.json に書き込み
+4. python src/main.py（ニュース収集→執筆→note下書き保存）
+5. 記事履歴をリポジトリにコミット
+
+## 絶対ルール
+- Anthropic API キーは使わない（OAuthトークンのみ）
+- Geminiは使わない（全工程Claude）
+- 会話の進捗・決定事項をこのファイルに逐一保存する
