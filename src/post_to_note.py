@@ -192,6 +192,149 @@ def insert_section_with_headings(driver, section_text: str):
     flush_batch()
 
 
+def _upload_cover_image(driver, abs_cover: str, note_key: str):
+    """カバー画像（アイキャッチ）をアップロードして note に設定する"""
+    # ── アプローチ1: エディタ上部のアイキャッチエリアをクリック ──
+    triggered = False
+    for sel in [
+        "[class*='eyecatch']", "[class*='Eyecatch']",
+        "[class*='EyeCatch']", "[class*='eye-catch']",
+        "[class*='cover']", "[class*='Cover']",
+        "[class*='headerImage']", "[class*='header-image']",
+        "[class*='thumbnail']", "[class*='Thumbnail']",
+        "button[aria-label*='アイキャッチ']", "button[aria-label*='画像']",
+        "label[class*='image']", "label[class*='Image']",
+        "[class*='addImage']", "[class*='uploadImage']",
+    ]:
+        els = driver.find_elements(By.CSS_SELECTOR, sel)
+        if els:
+            try:
+                driver.execute_script("arguments[0].scrollIntoView(true);", els[0])
+                driver.execute_script("arguments[0].click();", els[0])
+                time.sleep(2)
+                triggered = True
+                break
+            except Exception:
+                pass
+
+    # ── ファイル入力が出現したか確認して send_keys ──
+    def _try_send_keys_to_file_input():
+        driver.execute_script("""
+            document.querySelectorAll('input[type="file"]').forEach(function(el) {
+                el.style.display = 'block';
+                el.style.visibility = 'visible';
+                el.style.opacity = '1';
+                el.style.position = 'fixed';
+                el.style.top = '0'; el.style.left = '0';
+                el.style.width = '1px'; el.style.height = '1px';
+                el.removeAttribute('tabindex');
+            });
+        """)
+        time.sleep(0.5)
+        file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
+        if file_inputs:
+            file_inputs[0].send_keys(abs_cover)
+            time.sleep(6)
+            # 保存/決定ボタンがあればクリック
+            for xpath in ["//button[contains(.,'保存')]", "//button[contains(.,'決定')]",
+                          "//button[contains(.,'完了')]", "//button[contains(.,'OK')]",
+                          "//button[contains(.,'適用')]"]:
+                btns = driver.find_elements(By.XPATH, xpath)
+                if btns:
+                    try:
+                        driver.execute_script("arguments[0].click();", btns[0])
+                        time.sleep(2)
+                    except Exception:
+                        pass
+                    break
+            print("  カバー画像 設定完了（エディタUI）")
+            return True
+        return False
+
+    if _try_send_keys_to_file_input():
+        return
+
+    # ── アプローチ2: 「公開に進む」モーダルでアイキャッチを設定 ──
+    print("  エディタUIでアイキャッチが見つからず、公開設定モーダルから試みる...")
+    try:
+        pub_btn = driver.find_element(By.XPATH, "//button[contains(.,'公開に進む')]")
+        driver.execute_script("arguments[0].click();", pub_btn)
+        time.sleep(3)
+        # モーダル内のアイキャッチエリアを探す
+        for sel in [
+            "[class*='eyecatch']", "[class*='Eyecatch']", "[class*='EyeCatch']",
+            "[class*='thumbnail']", "[class*='cover']",
+            "button[aria-label*='アイキャッチ']",
+        ]:
+            els = driver.find_elements(By.CSS_SELECTOR, sel)
+            if els:
+                try:
+                    driver.execute_script("arguments[0].click();", els[0])
+                    time.sleep(2)
+                    break
+                except Exception:
+                    pass
+        if _try_send_keys_to_file_input():
+            # モーダルを閉じてエディタに戻る
+            for sel in ["button[aria-label*='閉じ']", "[class*='close']",
+                        "//button[contains(.,'閉じる')]", "//button[contains(.,'キャンセル')]"]:
+                btns = driver.find_elements(By.XPATH, sel) if sel.startswith("//") else driver.find_elements(By.CSS_SELECTOR, sel)
+                if btns:
+                    try:
+                        driver.execute_script("arguments[0].click();", btns[0])
+                        time.sleep(1)
+                    except Exception:
+                        pass
+                    break
+            return
+        # モーダルを閉じてエディタに戻る
+        try:
+            driver.find_element(By.XPATH, "//button[contains(.,'閉じる')]").click()
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"  [WARN] 公開設定モーダルアプローチ失敗: {e}")
+
+    # ── アプローチ3: note API でファイルをbase64エンコードしてアップロード ──
+    print("  APIでアイキャッチをアップロード試みる...")
+    try:
+        import base64
+        with open(abs_cover, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
+        ext = os.path.splitext(abs_cover)[1].lower().replace(".", "") or "png"
+        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                "webp": "image/webp"}.get(ext, "image/png")
+
+        result = driver.execute_async_script(f"""
+            var done = arguments[arguments.length - 1];
+            var b64 = "{img_b64}";
+            var mime = "{mime}";
+            var byteChars = atob(b64);
+            var byteArr = new Uint8Array(byteChars.length);
+            for (var i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+            var blob = new Blob([byteArr], {{type: mime}});
+            var fd = new FormData();
+            fd.append("image", blob, "cover.{ext}");
+            fetch("/api/v1/text_notes/{note_key}/eyecatch", {{
+                method: "POST",
+                credentials: "include",
+                headers: {{"x-requested-with": "XMLHttpRequest"}},
+                body: fd
+            }})
+            .then(function(r) {{ return r.text().then(function(t) {{ done({{status: r.status, text: t.substring(0,200)}}); }}); }})
+            .catch(function(e) {{ done({{error: e.toString()}}); }});
+        """)
+        if result and result.get("status") in (200, 201):
+            print(f"  カバー画像 API設定完了")
+            return
+        else:
+            print(f"  [WARN] API upload: status={result.get('status') if result else 'None'} text={result.get('text','')[:100]}")
+    except Exception as e:
+        print(f"  [WARN] API アイキャッチ設定失敗: {e}")
+
+    print("  [WARN] カバー画像の設定に失敗しました（全アプローチ試行済み）")
+
+
 def insert_magazine_embed(driver, magazine_url: str):
     """有料マガジンURLを note.com の埋め込みブロックとして挿入"""
     try:
@@ -426,61 +569,7 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
             abs_cover = os.path.abspath(cover_path)
             print(f"  カバー画像を設定中: {os.path.basename(abs_cover)}")
             try:
-                # ① アイキャッチ/カバー画像エリアをクリックして file input を活性化
-                triggered = False
-                for sel in [
-                    "[class*='eyecatch']", "[class*='Eyecatch']",
-                    "[class*='cover']", "[class*='Cover']",
-                    "[class*='headerImage']", "[class*='header-image']",
-                    "button[aria-label*='画像']", "button[aria-label*='アイキャッチ']",
-                    "[class*='addImage']",
-                ]:
-                    els = driver.find_elements(By.CSS_SELECTOR, sel)
-                    if els:
-                        try:
-                            driver.execute_script("arguments[0].click();", els[0])
-                            time.sleep(1.5)
-                            triggered = True
-                            break
-                        except Exception:
-                            pass
-
-                # ② hidden な file input を強制表示して send_keys
-                driver.execute_script("""
-                    document.querySelectorAll('input[type="file"]').forEach(function(el) {
-                        el.style.display = 'block';
-                        el.style.visibility = 'visible';
-                        el.style.opacity = '1';
-                        el.style.position = 'fixed';
-                        el.style.top = '0';
-                        el.style.left = '0';
-                        el.style.width = '1px';
-                        el.style.height = '1px';
-                    });
-                """)
-                time.sleep(0.5)
-                file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
-                if file_inputs:
-                    file_inputs[0].send_keys(abs_cover)
-                    time.sleep(5)  # アップロード完了まで5秒待つ
-                    # 保存/決定ダイアログが出た場合はクリック
-                    for xpath in [
-                        "//button[contains(.,'保存')]",
-                        "//button[contains(.,'決定')]",
-                        "//button[contains(.,'完了')]",
-                        "//button[contains(.,'OK')]",
-                    ]:
-                        btns = driver.find_elements(By.XPATH, xpath)
-                        if btns:
-                            try:
-                                driver.execute_script("arguments[0].click();", btns[0])
-                                time.sleep(2)
-                            except Exception:
-                                pass
-                            break
-                    print("  カバー画像 設定完了")
-                else:
-                    print("  [WARN] file input 見つからず（カバー画像スキップ）")
+                _upload_cover_image(driver, abs_cover, note_key)
             except Exception as e:
                 print(f"  [WARN] カバー画像設定失敗: {e}")
 
