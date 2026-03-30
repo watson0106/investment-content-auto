@@ -150,18 +150,26 @@ def generate_stock_chart(symbol: str, output_path: str) -> str | None:
 
 def extract_stock_tickers(article_text: str) -> list[str]:
     """
-    記事から銘柄名行を抽出してティッカーを返す。
-    例: 「銘柄名：トヨタ自動車（7203）」→ "7203.T"
-         「銘柄名：NVIDIA（NVDA）」→ "NVDA"
+    記事から銘柄のティッカーを抽出する。
+    「# このニュースで注目すべき銘柄」セクション直後の行から抽出。
+    例: 「トヨタ自動車（7203）」→ "7203.T"
+         「NVIDIA（NVDA）」→ "NVDA"
+    後方互換: 「銘柄名：トヨタ自動車（7203）」形式も対応
     """
     tickers = []
-    for m in re.finditer(r'銘柄名[：:]\s*[^\n（(]+[（(]([^）)]+)[）)]', article_text):
-        raw = m.group(1).strip()
-        # 日本株（数字4桁）→ ".T" 付加
-        if re.match(r'^\d{4}$', raw):
-            tickers.append(raw + ".T")
-        else:
-            tickers.append(raw)
+    # 「# このニュースで注目すべき銘柄」直後の行から抽出
+    for section_match in re.finditer(r'# このニュースで注目すべき銘柄\s*\n([^\n]+)', article_text):
+        line = section_match.group(1).strip()
+        # 「銘柄名：」プレフィックスがあれば除去
+        line = re.sub(r'^銘柄名[：:]\s*', '', line)
+        # （コード）または（TICKER）を抽出
+        m = re.search(r'[（(]([^）)]+)[）)]', line)
+        if m:
+            raw = m.group(1).strip()
+            if re.match(r'^\d{4}$', raw):
+                tickers.append(raw + ".T")
+            else:
+                tickers.append(raw)
     return tickers
 
 

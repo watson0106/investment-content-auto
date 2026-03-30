@@ -121,7 +121,7 @@ def main():
     JST = datetime.timezone(datetime.timedelta(hours=9))
     today = datetime.datetime.now(JST)
     # 速報タイトル固定フォーマット
-    best_title = f"新聞より早くてわかりやすい今日のニュース速報｜{today.month}/{today.day}"
+    best_title = f"新聞より早くてわかりやすい今日の投資ニュース速報｜{today.month}/{today.day}"
     print(f"  タイトル（固定）: {best_title}")
 
     with open("output/article_with_images.json", encoding="utf-8") as f:
