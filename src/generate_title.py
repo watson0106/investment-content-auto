@@ -65,17 +65,8 @@ def generate_titles(article_text: str) -> list[str]:
         text = result.stdout.strip() if result.returncode == 0 else ""
 
     if not text:
-        # Gemini フォールバック
-        from google import genai
-        from google.genai import types
-        print("  Gemini でタイトル生成中...")
-        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.8, max_output_tokens=1024),
-        )
-        text = response.text.strip()
+        print("  [WARN] Claude CLI でタイトル生成失敗。固定タイトルにフォールバック。")
+        return []
     lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
 
     # 番号付きリストをパース
@@ -130,7 +121,7 @@ def main():
     JST = datetime.timezone(datetime.timedelta(hours=9))
     today = datetime.datetime.now(JST)
     # 速報タイトル固定フォーマット
-    best_title = f"新聞より早くてわかりやすい今日の投資ニュース速報｜{today.month}/{today.day}"
+    best_title = f"新聞より早くてわかりやすい今日のニュース速報｜{today.month}/{today.day}"
     print(f"  タイトル（固定）: {best_title}")
 
     with open("output/article_with_images.json", encoding="utf-8") as f:
