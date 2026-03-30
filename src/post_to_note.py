@@ -86,14 +86,33 @@ def login(driver, wait: WebDriverWait):
         print("  ログイン成功（API）")
     else:
         print(f"  API login failed (status={result.get('status') if result else 'None'}), フォームで試みる...")
+        time.sleep(2)
         email_field = wait.until(EC.presence_of_element_located((By.ID, "email")))
-        email_field.clear()
-        email_field.send_keys(NOTE_EMAIL)
+        # React-aware input: nativeInputValueSetter で onChange を発火させる
+        driver.execute_script("""
+            var el = arguments[0];
+            var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            setter.call(el, arguments[1]);
+            el.dispatchEvent(new Event('input', {bubbles: true}));
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+        """, email_field, NOTE_EMAIL)
+        time.sleep(0.5)
         pw_field = driver.find_element(By.ID, "password")
-        pw_field.clear()
-        pw_field.send_keys(NOTE_PASSWORD)
-        pw_field.send_keys(Keys.RETURN)
-        for _ in range(10):
+        driver.execute_script("""
+            var el = arguments[0];
+            var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            setter.call(el, arguments[1]);
+            el.dispatchEvent(new Event('input', {bubbles: true}));
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+        """, pw_field, NOTE_PASSWORD)
+        time.sleep(0.5)
+        # ログインボタンをクリック（Enterキーフォールバック）
+        try:
+            login_btn = driver.find_element(By.XPATH, "//button[contains(.,'ログイン') and not(contains(.,'Google')) and not(contains(.,'Apple'))]")
+            driver.execute_script("arguments[0].click();", login_btn)
+        except Exception:
+            pw_field.send_keys(Keys.RETURN)
+        for _ in range(15):
             time.sleep(1)
             if "login" not in driver.current_url:
                 break

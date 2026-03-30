@@ -30,7 +30,7 @@
 - CLAUDE_CODE_CREDENTIALS：OAuthトークンJSON（キーチェーンから取得）
 - NOTE_EMAIL = watson19910704@gmail.com
 - NOTE_PASSWORD = ts2164
-- GEMINI_API_KEY：カバー画像生成用（ワークフローのenv:に追加済み）
+- GEMINI_API_KEY：カバー画像生成用（ワークフローのenv:に追加済み。**GitHub Secretsで管理。CLAUDE.mdには書かない**）
 
 ### note投稿方式（JS API方式）✅ 動作確認済み
 - undetected-chromedriver + headless=false でWAFを回避
