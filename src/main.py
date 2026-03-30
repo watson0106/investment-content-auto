@@ -70,47 +70,53 @@ def mode_generate():
         traceback.print_exc()
         sys.exit(1)
 
-    # ② 記事2本執筆
+    # ② 記事執筆（1本・2ニュース構成）
     print(f"\n{'─'*40}")
-    print("  ② 記事執筆（2本）")
+    print("  ② 記事執筆（1本・2ニュース構成）")
     print(f"{'─'*40}")
     try:
         result = deep_research.main()
         a1 = result["article_1"]
-        a2 = result["article_2"]
-        print(f"  記事1: {a1['title']}")
-        print(f"  記事2: {a2['title']}")
+        print(f"  タイトル: {a1['title']}")
     except Exception:
         print("❌ 記事執筆失敗（重要ステップ）")
         traceback.print_exc()
         sys.exit(1)
 
-    # ③ 記事1 即座に下書き保存
+    # ③ 株式短期分析パイプライン（有料note生成 + 無料記事へのリンク挿入）
     print(f"\n{'─'*40}")
-    print("  ③ 記事1 note下書き保存")
+    print("  ③ 株式短期分析（有料note）")
+    print(f"{'─'*40}")
+    try:
+        import importlib.util
+        _sa_main = os.path.expanduser("~/stock-analysis-auto/src/main.py")
+        if os.path.exists(_sa_main):
+            spec = importlib.util.spec_from_file_location("stock_analysis_main", _sa_main)
+            _sa_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(_sa_mod)
+            _sa_mod.run(article_path="output/article_1.json")
+        else:
+            print("  [SKIP] ~/stock-analysis-auto が見つかりません")
+    except Exception:
+        print("  [WARN] 株式短期分析パイプライン失敗（メインパイプラインは継続）")
+        traceback.print_exc()
+
+    # ④ note下書き保存
+    print(f"\n{'─'*40}")
+    print("  ④ note下書き保存")
     print(f"{'─'*40}")
     try:
         r1 = mode_post(1)
     except SystemExit:
         r1 = {"url": ""}
 
-    # ④ 記事2 即座に下書き保存
-    print(f"\n{'─'*40}")
-    print("  ④ 記事2 note下書き保存")
-    print(f"{'─'*40}")
-    try:
-        r2 = mode_post(2)
-    except SystemExit:
-        r2 = {"url": ""}
-
     print("\n" + "=" * 50)
     print("✅ 生成・保存完了")
-    print(f"  記事1: {r1.get('url', 'output/article_1.json')}")
-    print(f"  記事2: {r2.get('url', 'output/article_2.json')}")
+    print(f"  記事: {r1.get('url', 'output/article_1.json')}")
     print("=" * 50)
 
-    notify("【下書き保存完了】", f"記事1: {a1['title']} / 記事2: {a2['title']}")
-    return r1, r2
+    notify("【下書き保存完了】", a1['title'])
+    return r1, r1
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -173,14 +179,14 @@ def mode_post(article_num: int):
 # ─────────────────────────────────────────────────────────────────
 
 def run_pipeline():
-    """引数なし手動実行: generate → post1 → post2"""
+    """引数なし手動実行: generate → post1"""
     print("=" * 50)
     print("投資記事自動生成パイプライン 開始（全ステップ）")
     today = datetime.datetime.now(JST)
     print(f"  日時: {today.strftime('%Y-%m-%d %H:%M')} JST  曜日: {['月','火','水','木','金','土','日'][today.weekday()]}")
     print("=" * 50)
 
-    result1, result2 = mode_generate()
+    result1, _ = mode_generate()
 
     # スキ数更新
     try:
@@ -206,8 +212,7 @@ def run_pipeline():
 
     print("\n" + "=" * 50)
     print("✅ パイプライン完了")
-    print(f"  記事1: {result1.get('url', '不明')}")
-    print(f"  記事2: {result2.get('url', '不明')}")
+    print(f"  記事: {result1.get('url', '不明')}")
     print("=" * 50)
 
 
