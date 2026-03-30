@@ -126,25 +126,19 @@ def select_best_title(titles: list[str], strategy_state: dict = None) -> str:
 def main():
     print("=== ⑤ タイトル生成 ===")
 
+    import datetime
+    JST = datetime.timezone(datetime.timedelta(hours=9))
+    today = datetime.datetime.now(JST)
+    # 速報タイトル固定フォーマット
+    best_title = f"新聞より早くてわかりやすい今日の投資ニュース速報｜{today.month}/{today.day}"
+    print(f"  タイトル（固定）: {best_title}")
+
     with open("output/article_with_images.json", encoding="utf-8") as f:
         data = json.load(f)
 
-    # strategy_state を読み込んでタイトル選択に活用
-    strategy_state = {}
-    try:
-        state_path = os.path.join(os.path.dirname(__file__), "..", "data", "strategy_state.json")
-        with open(state_path, encoding="utf-8") as f:
-            strategy_state = json.load(f)
-    except Exception:
-        pass
-
-    titles = generate_titles(data["article"])
-    best_title = select_best_title(titles, strategy_state) if titles else "今日の投資ニュース解説"
-    print(f"  選択タイトル: {best_title}")
-
     result = {
         "title":        best_title,
-        "title_options": titles,
+        "title_options": [best_title],
         "article":      data["article"],
         "image_paths":  data.get("image_paths", []),
         "cover_path":   data.get("cover_path"),
