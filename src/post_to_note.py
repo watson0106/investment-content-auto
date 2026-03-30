@@ -374,17 +374,49 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
 
         # 新規記事エディタを開く
         print("  エディタを開いています...")
-        driver.get("https://note.com/notes/new")
 
-        # 方法1: URLが /notes/XXXX/edit に変わるまで最大30秒待つ
+        # 方法0: ログイン直後（note.com ドメイン）で API 経由でノート作成
         note_key = None
-        for i in range(30):
-            time.sleep(1)
-            current = driver.current_url
-            m = re.search(r"/notes/([a-zA-Z0-9]+)/edit", current)
-            if m:
-                note_key = m.group(1)
-                break
+        print("  note.com ドメインでノート作成を試みる...")
+        driver.set_script_timeout(20)
+        pre_create = driver.execute_async_script("""
+            var done = arguments[arguments.length - 1];
+            fetch('/api/v1/text_notes', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'x-requested-with': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({status: 'draft'})
+            })
+            .then(function(r) {
+                return r.text().then(function(t) { done({status: r.status, text: t}); });
+            })
+            .catch(function(e) { done({error: e.toString()}); });
+        """)
+        if pre_create and pre_create.get("status") in (200, 201):
+            try:
+                pre_data = json.loads(pre_create["text"])
+                note_key = (pre_data.get("data", {}).get("key") or pre_data.get("key"))
+                if note_key:
+                    print(f"  note.com API でノート作成成功: {note_key}")
+                    driver.get(f"https://editor.note.com/notes/{note_key}/edit/")
+                    time.sleep(5)
+            except Exception as e:
+                print(f"  [WARN] ノートキー解析失敗: {e}")
+
+        # 方法1: /notes/new に遷移してURLが変わるまで最大60秒待つ
+        if not note_key:
+            driver.get("https://note.com/notes/new")
+            for i in range(60):
+                time.sleep(1)
+                current = driver.current_url
+                m = re.search(r"/notes/([a-zA-Z0-9]+)/edit", current)
+                if m:
+                    note_key = m.group(1)
+                    break
 
         # 方法2: URLが変わらない場合、editor.note.com から API 経由で作成
         if not note_key:
@@ -484,41 +516,71 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
             cover_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "cover_image.png"))
         if cover_path and os.path.exists(cover_path):
             print("  カバー画像を設定中...")
+            cover_set = False
             try:
-                # アイキャッチ画像アップロードボタンを探してクリック
-                eyecatch_btn = driver.find_elements(By.XPATH,
-                    "//*[contains(@class,'eyecatch') or contains(text(),'アイキャッチ') or contains(@aria-label,'アイキャッチ')]"
-                )
-                if not eyecatch_btn:
-                    # file inputを直接探す
-                    file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
-                    if file_inputs:
-                        file_inputs[0].send_keys(cover_path)
-                        time.sleep(3)
-                        # トリミングダイアログが出た場合は確定ボタンを押す
-                        try:
-                            confirm = driver.find_element(By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'OK')]")
-                            confirm.click()
-                            time.sleep(2)
-                        except Exception:
-                            pass
+                # ① カバー画像ボタン → 「画像をアップロード」サブボタン → note-editor-eyecatch-input
+                cover_area_btn = driver.find_element(By.CSS_SELECTOR, 'button[aria-label="画像を追加"]')
+                driver.execute_script("arguments[0].click();", cover_area_btn)
+                time.sleep(0.8)
+
+                # 「画像をアップロード」サブボタンをクリック
+                upload_btn = None
+                for btn in driver.find_elements(By.CSS_SELECTOR, ".sc-131cded0-5 button, .sc-131cded0-6 button"):
+                    if "アップロード" in (btn.text or ""):
+                        upload_btn = btn
+                        break
+                if upload_btn is None:
+                    # テキストで探す（クラス名変更時のフォールバック）
+                    for btn in driver.find_elements(By.TAG_NAME, "button"):
+                        if "アップロード" in (btn.text or "") and "画像" in (btn.text or ""):
+                            upload_btn = btn
+                            break
+
+                if upload_btn:
+                    driver.execute_script("arguments[0].click();", upload_btn)
+                    time.sleep(0.8)
+
+                    # note-editor-eyecatch-input が現れるはず
+                    eyecatch_input = None
+                    for _ in range(10):
+                        els = driver.find_elements(By.ID, "note-editor-eyecatch-input")
+                        if els:
+                            eyecatch_input = els[0]
+                            break
+                        time.sleep(0.3)
+
+                    if eyecatch_input:
+                        driver.execute_script("arguments[0].removeAttribute('style');", eyecatch_input)
+                        eyecatch_input.send_keys(os.path.abspath(cover_path))
+                        time.sleep(1)
+
+                        # 画像クロップ/確認モーダルの「保存」ボタンをクリック
+                        save_clicked = False
+                        for _ in range(12):
+                            time.sleep(0.5)
+                            save_btns = driver.find_elements(
+                                By.XPATH, "//button[normalize-space()='保存']"
+                            )
+                            if save_btns:
+                                driver.execute_script("arguments[0].click();", save_btns[-1])
+                                save_clicked = True
+                                print("  カバー画像 「保存」クリック完了")
+                                break
+                        if not save_clicked:
+                            print("  [WARN] 「保存」ボタンが見つかりませんでした")
+
+                        time.sleep(7)  # アップロード完了まで待機
+                        cover_set = True
                         print("  カバー画像 設定完了")
+                    else:
+                        print("  [WARN] note-editor-eyecatch-input が見つかりません")
                 else:
-                    eyecatch_btn[0].click()
-                    time.sleep(2)
-                    file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
-                    if file_inputs:
-                        file_inputs[-1].send_keys(cover_path)
-                        time.sleep(3)
-                        try:
-                            confirm = driver.find_element(By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'OK')]")
-                            confirm.click()
-                            time.sleep(2)
-                        except Exception:
-                            pass
-                        print("  カバー画像 設定完了")
+                    print("  [WARN] 画像をアップロードボタンが見つかりません")
             except Exception as e:
                 print(f"  [WARN] カバー画像設定失敗: {e}")
+
+            if not cover_set:
+                print("  [WARN] カバー画像を設定できませんでした（手動設定が必要）")
 
         # __IMAGE_n__ プレースホルダーで本文を分割して順番に挿入
         body_text = body[:50000]
@@ -535,6 +597,7 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
 
         img_count = 0
         img_success = 0
+        prev_ended_with_heading = False
         for part in parts:
             m2 = re.match(r'__IMAGE_(\d+)__', part.strip())
             if m2:
@@ -543,20 +606,30 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
                     img_path = image_paths[idx]
                     img_count += 1
                     print(f"  [{img_count}/{len(image_paths)}] 画像挿入中: {os.path.basename(img_path)}")
+                    # H3直後の空行（insertText('\n')で生成）をBackspaceで削除してスペースを詰める
+                    if prev_ended_with_heading:
+                        try:
+                            editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
+                            editor_el.send_keys(Keys.BACK_SPACE)
+                            time.sleep(0.1)
+                        except Exception:
+                            pass
+                    prev_ended_with_heading = False
                     ok = insert_image_to_editor(driver, img_path)
                     if ok:
                         img_success += 1
                         print(f"    [OK] 画像{img_count} 挿入確認済み（DOM上にimgタグあり）")
-                        # キャプション入力モードを抜けるためにEnterを2回押す
+                        # キャプション入力モードを抜けるためにEnterを1回押す
                         editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
-                        editor_el.send_keys(Keys.RETURN)
-                        time.sleep(0.3)
                         editor_el.send_keys(Keys.RETURN)
                         time.sleep(0.3)
                     else:
                         print(f"    [FAIL] 画像{img_count} 挿入失敗（DOM上にimgタグ増えず）")
             elif part.strip():
                 insert_section_with_headings(driver, part.strip())
+                # テキストパートが見出し（H2/H3）で終わっているか確認
+                stripped_lines = [l for l in part.strip().split('\n') if l.strip()]
+                prev_ended_with_heading = bool(stripped_lines and re.match(r'^#{1,3}\s', stripped_lines[-1]))
                 time.sleep(0.3)
 
         # 最終検証: エディタ内のimg数を確認
@@ -568,10 +641,10 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         time.sleep(2)
 
         if price > 0:
-            # 有料公開: note API で price を設定して公開
+            # 有料公開: 「公開に進む」→ モーダルで価格設定 → 公開
             print(f"  有料記事として公開中（{price}円）...")
-            driver.set_script_timeout(20)
-            # まず下書き保存
+
+            # ① まず下書き保存して本文を確定
             try:
                 draft_btn = wait.until(EC.element_to_be_clickable(
                     (By.XPATH, "//button[contains(., '下書き保存')]")
@@ -582,84 +655,96 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
             except Exception:
                 time.sleep(3)
 
-            # 有料設定: エディタUIの「公開設定」から有料を設定
+            # ② 「公開に進む」ボタンをクリック（React アプリ読み込みを待つ）
+            publish_modal_opened = False
             print(f"  有料設定中（{price}円）...")
             try:
-                # 「公開設定」や「販売設定」ボタンを探す
-                setting_btns = driver.find_elements(By.XPATH,
-                    "//button[contains(., '公開設定') or contains(., '販売設定') or contains(., '有料')]"
-                )
-                if not setting_btns:
-                    # 「…」メニューや歯車アイコンを試す
-                    setting_btns = driver.find_elements(By.CSS_SELECTOR,
-                        "[aria-label*='設定'], [class*='setting'], [class*='menu']"
+                pub_btn = None
+                for _ in range(20):  # 最大20秒待機
+                    btns = driver.find_elements(
+                        By.XPATH, "//button[contains(text(),'公開に進む')]"
                     )
-
-                if setting_btns:
-                    driver.execute_script("arguments[0].click();", setting_btns[0])
-                    time.sleep(2)
-
-                # 有料ラジオボタン/チェックボックスを探す
-                paid_opts = driver.find_elements(By.XPATH,
-                    "//*[contains(text(), '有料') or contains(text(), '販売')]"
-                )
-                for opt in paid_opts:
-                    try:
-                        driver.execute_script("arguments[0].click();", opt)
-                        time.sleep(1)
+                    if btns:
+                        pub_btn = btns[0]
                         break
-                    except Exception:
-                        continue
-
-                # 価格入力フィールドを探して入力
-                price_inputs = driver.find_elements(By.CSS_SELECTOR,
-                    "input[name*='price'], input[placeholder*='価格'], input[type='number']"
-                )
-                if price_inputs:
-                    price_inputs[0].clear()
-                    price_inputs[0].send_keys(str(price))
                     time.sleep(1)
-                    print(f"  価格 {price}円 を入力")
 
-                # note API経由で有料設定（エディタページに戻ってからAPIを叩く）
-                driver.get(f"https://editor.note.com/notes/{note_key}/edit/")
-                time.sleep(3)
-                driver.set_script_timeout(20)
-                pub_result = driver.execute_async_script(f"""
-                    var done = arguments[arguments.length - 1];
-                    fetch('/api/v1/text_notes/{note_key}', {{
-                        method: 'PUT',
-                        credentials: 'include',
-                        headers: {{
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'x-requested-with': 'XMLHttpRequest'
-                        }},
-                        body: JSON.stringify({{
-                            price: {price}
-                        }})
-                    }})
-                    .then(function(r) {{
-                        return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
-                    }})
-                    .catch(function(e) {{ done({{error: e.toString()}}); }});
-                """)
-                if pub_result and pub_result.get("status") in (200, 201):
-                    print(f"  有料設定成功 ({price}円)")
-                else:
-                    print(f"  [WARN] 有料設定: status={pub_result.get('status') if pub_result else 'None'}")
-                    print(f"  noteのエディタから手動で{price}円に設定してください")
-            except Exception as e:
-                print(f"  [WARN] 有料設定失敗: {e}")
-                print(f"  noteのエディタから手動で{price}円に設定してください")
-                try:
-                    draft_btn = wait.until(EC.element_to_be_clickable(
-                        (By.XPATH, "//button[contains(., '下書き保存')]")
-                    ))
-                    driver.execute_script("arguments[0].click();", draft_btn)
+                if pub_btn:
+                    driver.execute_script("arguments[0].click();", pub_btn)
                     time.sleep(3)
-                except Exception:
-                    time.sleep(5)
+                    publish_modal_opened = True
+                    print("  「公開に進む」クリック完了")
+                else:
+                    print("  [WARN] 「公開に進む」ボタンが見つかりません")
+            except Exception as e:
+                print(f"  [WARN] 「公開に進む」クリック失敗: {e}")
+
+            # ③ モーダル内の有料販売オプションをクリック
+            if publish_modal_opened:
+                try:
+                    # 「有料」「販売」等のラベル/ラジオボタンを探す
+                    paid_set = False
+                    for _ in range(10):
+                        paid_opts = driver.find_elements(
+                            By.XPATH,
+                            "//*[contains(text(),'有料') or contains(text(),'販売設定') or contains(text(),'テキストを販売')]"
+                        )
+                        if paid_opts:
+                            for opt in paid_opts:
+                                try:
+                                    driver.execute_script("arguments[0].click();", opt)
+                                    time.sleep(1)
+                                    paid_set = True
+                                    break
+                                except Exception:
+                                    continue
+                        if paid_set:
+                            break
+                        time.sleep(1)
+
+                    if paid_set:
+                        print("  有料オプション選択完了")
+                    else:
+                        print("  [WARN] 有料オプションが見つかりません")
+
+                    # 価格入力
+                    price_inputs = driver.find_elements(
+                        By.CSS_SELECTOR,
+                        "input[type='number'], input[name*='price'], input[placeholder*='価格']"
+                    )
+                    if price_inputs:
+                        price_inputs[0].clear()
+                        price_inputs[0].send_keys(str(price))
+                        time.sleep(1)
+                        print(f"  価格 {price}円 を入力")
+                    else:
+                        print("  [WARN] 価格入力フィールドが見つかりません")
+
+                    # 「公開する」ボタンをクリック
+                    publish_confirm_btns = driver.find_elements(
+                        By.XPATH, "//button[contains(text(),'公開する') or contains(text(),'販売する')]"
+                    )
+                    if publish_confirm_btns:
+                        driver.execute_script("arguments[0].click();", publish_confirm_btns[0])
+                        time.sleep(3)
+                        print(f"  有料記事公開完了 ({price}円)")
+                    else:
+                        # 「公開する」が見つからない場合は下書き保存して手動指示
+                        print("  [WARN] 「公開する」ボタンが見つかりません")
+                        print(f"  ⚠️  noteのエディタから手動で{price}円に設定して公開してください")
+                        try:
+                            close_btns = driver.find_elements(By.XPATH, "//button[contains(text(),'閉じる')]")
+                            if close_btns:
+                                driver.execute_script("arguments[0].click();", close_btns[0])
+                                time.sleep(1)
+                        except Exception:
+                            pass
+
+                except Exception as e:
+                    print(f"  [WARN] 有料設定モーダル操作失敗: {e}")
+                    print(f"  ⚠️  noteのエディタから手動で{price}円に設定して公開してください")
+            else:
+                print(f"  ⚠️  noteのエディタから手動で{price}円に設定して公開してください")
         else:
             # 無料記事: 下書き保存
             print("  下書き保存中...")
