@@ -73,7 +73,7 @@ def run_pipeline():
         ("④ 画像生成",                  generate_images.main),
         ("⑤ タイトル生成（動的）",       generate_title.main),
         ("⑥ note 投稿（無料）",          post_to_note.main),
-        ("⑦ YouTube note 下書き",       youtube_note_pipeline.main),
+        # ⑦ YouTube note は無効化（Gemini使用・英語記事のため）
     ]
 
     posted_note_key = None

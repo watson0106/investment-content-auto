@@ -218,76 +218,14 @@ def find_desktop_cover_image() -> str | None:
 
 
 def generate_cover_image(article_text: str) -> str | None:
-    """カバー画像を取得（デスクトップ優先 → Gemini API 生成）"""
+    """カバー画像を取得（デスクトップ優先 → assets/cover_image.png）"""
     # ① デスクトップの投資画像フォルダを確認
     desktop_path = find_desktop_cover_image()
     if desktop_path:
         return desktop_path
 
-    # ② Gemini API で生成
-    if not GEMINI_API_KEY:
-        print("  カバー画像: GEMINI_API_KEY なし、スキップ")
-        return None
-
-    try:
-        from google import genai
-        from google.genai import types
-
-        # H1見出しを抽出
-        h1_titles = re.findall(r'^#\s+(.+)', article_text, re.MULTILINE)
-        titles_block = "\n".join(f"・{t.strip()}" for t in h1_titles[:4]) if h1_titles else article_text[:300]
-
-        prompt = f"""note.com投資ブログのカバー画像（アイキャッチ）を作成してください。
-
-【本日の主要ニュース】
-{titles_block}
-
-【デザイン要件】
-- 画像上部に「今日のニュース速報」を大きく日本語で入れる
-- ダークネイビー〜黒のグラデーション背景にゴールド・ホワイトのテキスト
-- 株式チャート・世界地図・データビジュアル・金融都市を組み合わせた迫力あるビジュアル
-- Breaking News / 速報感のある緊張感あるレイアウト
-- 16:9横長（1280×720以上）、高解像度
-- noteのカバー画像として視覚的に映える品質
-- 日本語テキストは鮮明で読みやすいフォント
-"""
-
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        os.makedirs("output/images", exist_ok=True)
-        path = "output/images/cover.png"
-
-        for model in ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview",
-                       "gemini-2.5-flash-image", "imagen-4.0-generate-001"]:
-            try:
-                if "imagen" in model:
-                    resp = client.models.generate_images(
-                        model=model, prompt=prompt,
-                        config=types.GenerateImagesConfig(number_of_images=1),
-                    )
-                    if resp.generated_images:
-                        with open(path, "wb") as f:
-                            f.write(resp.generated_images[0].image.image_bytes)
-                        print(f"  カバー画像生成完了 [{model}]")
-                        return os.path.abspath(path)
-                else:
-                    resp = client.models.generate_content(
-                        model=model, contents=prompt,
-                        config=types.GenerateContentConfig(
-                            response_modalities=["image", "text"]
-                        ),
-                    )
-                    for part in resp.candidates[0].content.parts:
-                        if part.inline_data:
-                            with open(path, "wb") as f:
-                                f.write(part.inline_data.data)
-                            print(f"  カバー画像生成完了 [{model}]")
-                            return os.path.abspath(path)
-            except Exception as e:
-                print(f"  [WARN] {model}: {e}")
-                continue
-    except Exception as e:
-        print(f"  [WARN] カバー画像生成失敗: {e}")
-
+    # ② Geminiは使用しない
+    print("  カバー画像: デスクトップ画像なし（assets/cover_image.pngをフォールバックとして使用）")
     return None
 
 
