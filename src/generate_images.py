@@ -192,10 +192,39 @@ def generate_stock_charts(article_text: str) -> tuple[str, list[str]]:
     return article_text, chart_paths
 
 
-# ─── Gemini カバー画像（APIキーがある場合のみ） ─────────────────────
+# ─── カバー画像（デスクトップ優先 → Gemini API フォールバック） ──────
+
+def find_desktop_cover_image() -> str | None:
+    """
+    ~/Desktop/投資画像/ 内の最新ファイルを返す。
+    ファイル名が Gemini_Gener... で始まるものを優先し、なければ最新ファイルを使う。
+    """
+    desktop_dir = os.path.expanduser("~/Desktop/投資画像")
+    if not os.path.isdir(desktop_dir):
+        return None
+    files = [f for f in os.listdir(desktop_dir)
+             if os.path.isfile(os.path.join(desktop_dir, f))
+             and f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+    if not files:
+        return None
+    # Gemini_Gener... で始まるファイルを優先
+    gemini_files = [f for f in files if f.startswith('Gemini_Gener')]
+    candidates = gemini_files if gemini_files else files
+    # 最終更新日時が新しいものを選ぶ
+    candidates.sort(key=lambda f: os.path.getmtime(os.path.join(desktop_dir, f)), reverse=True)
+    chosen = os.path.join(desktop_dir, candidates[0])
+    print(f"  カバー画像: デスクトップから使用 → {candidates[0]}")
+    return chosen
+
 
 def generate_cover_image(article_text: str) -> str | None:
-    """記事内容からカバー画像を生成（Gemini）"""
+    """カバー画像を取得（デスクトップ優先 → Gemini API 生成）"""
+    # ① デスクトップの投資画像フォルダを確認
+    desktop_path = find_desktop_cover_image()
+    if desktop_path:
+        return desktop_path
+
+    # ② Gemini API で生成
     if not GEMINI_API_KEY:
         print("  カバー画像: GEMINI_API_KEY なし、スキップ")
         return None

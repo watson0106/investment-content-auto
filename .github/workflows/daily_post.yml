@@ -41,10 +41,11 @@ jobs:
 
       - name: パイプライン実行
         env:
-          NOTE_EMAIL:  ${{ secrets.NOTE_EMAIL }}
-          NOTE_PASSWORD: ${{ secrets.NOTE_PASSWORD }}
-          HEADLESS:    "false"
-          DISPLAY:     ":99"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NOTE_EMAIL:     ${{ secrets.NOTE_EMAIL }}
+          NOTE_PASSWORD:  ${{ secrets.NOTE_PASSWORD }}
+          HEADLESS:       "false"
+          DISPLAY:        ":99"
         run: |
           Xvfb :99 -screen 0 1280x900x24 &
           sleep 2

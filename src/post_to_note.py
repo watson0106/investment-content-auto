@@ -140,16 +140,33 @@ def clean_inline_markdown(text: str) -> str:
 
 
 def insert_section_with_headings(driver, section_text: str):
-    """セクションテキストを挿入（# → h1、## → h2 書式を適用）"""
+    """セクションテキストを挿入（# → h1、## → h2 書式を適用。余分なスペースを除去）"""
     lines = section_text.split('\n')
     batch: list[str] = []
 
     def flush_batch():
         if not batch:
             return
+        # 先頭・末尾の空行を除去し、連続する空行を1行に圧縮
+        compressed = []
+        prev_empty = False
+        for line in batch:
+            if line.strip() == '' or line.strip() == '---':
+                if not prev_empty and compressed:
+                    compressed.append('')
+                prev_empty = True
+            else:
+                compressed.append(line)
+                prev_empty = False
+        # 末尾の空行を除去
+        while compressed and compressed[-1] == '':
+            compressed.pop()
+        if not compressed:
+            batch.clear()
+            return
         driver.execute_script(
             "document.execCommand('insertText', false, arguments[0])",
-            '\n'.join(batch) + '\n'
+            '\n'.join(compressed) + '\n'
         )
         batch.clear()
 
@@ -409,13 +426,34 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
             abs_cover = os.path.abspath(cover_path)
             print(f"  カバー画像を設定中: {os.path.basename(abs_cover)}")
             try:
-                # JS でhidden な file input を表示してから send_keys
+                # ① アイキャッチ/カバー画像エリアをクリックして file input を活性化
+                triggered = False
+                for sel in [
+                    "[class*='eyecatch']", "[class*='Eyecatch']",
+                    "[class*='cover']", "[class*='Cover']",
+                    "[class*='headerImage']", "[class*='header-image']",
+                    "button[aria-label*='画像']", "button[aria-label*='アイキャッチ']",
+                    "[class*='addImage']",
+                ]:
+                    els = driver.find_elements(By.CSS_SELECTOR, sel)
+                    if els:
+                        try:
+                            driver.execute_script("arguments[0].click();", els[0])
+                            time.sleep(1.5)
+                            triggered = True
+                            break
+                        except Exception:
+                            pass
+
+                # ② hidden な file input を強制表示して send_keys
                 driver.execute_script("""
-                    var inputs = document.querySelectorAll('input[type="file"]');
-                    inputs.forEach(function(el) {
+                    document.querySelectorAll('input[type="file"]').forEach(function(el) {
                         el.style.display = 'block';
                         el.style.visibility = 'visible';
                         el.style.opacity = '1';
+                        el.style.position = 'fixed';
+                        el.style.top = '0';
+                        el.style.left = '0';
                         el.style.width = '1px';
                         el.style.height = '1px';
                     });
@@ -424,19 +462,25 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
                 file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
                 if file_inputs:
                     file_inputs[0].send_keys(abs_cover)
-                    time.sleep(5)  # アップロード完了待ち（5秒）
-                    # トリミングダイアログが出た場合は確定ボタンを押す
-                    try:
-                        confirm = WebDriverWait(driver, 5).until(EC.element_to_be_clickable(
-                            (By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'保存') or contains(.,'OK')]")
-                        ))
-                        driver.execute_script("arguments[0].click();", confirm)
-                        time.sleep(2)
-                    except Exception:
-                        pass
+                    time.sleep(5)  # アップロード完了まで5秒待つ
+                    # 保存/決定ダイアログが出た場合はクリック
+                    for xpath in [
+                        "//button[contains(.,'保存')]",
+                        "//button[contains(.,'決定')]",
+                        "//button[contains(.,'完了')]",
+                        "//button[contains(.,'OK')]",
+                    ]:
+                        btns = driver.find_elements(By.XPATH, xpath)
+                        if btns:
+                            try:
+                                driver.execute_script("arguments[0].click();", btns[0])
+                                time.sleep(2)
+                            except Exception:
+                                pass
+                            break
                     print("  カバー画像 設定完了")
                 else:
-                    print("  [WARN] file input 見つからず")
+                    print("  [WARN] file input 見つからず（カバー画像スキップ）")
             except Exception as e:
                 print(f"  [WARN] カバー画像設定失敗: {e}")
 

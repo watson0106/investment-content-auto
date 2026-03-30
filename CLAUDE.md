@@ -30,7 +30,7 @@
 - CLAUDE_CODE_CREDENTIALS：OAuthトークンJSON（キーチェーンから取得）
 - NOTE_EMAIL = watson19910704@gmail.com
 - NOTE_PASSWORD = ts2164
-- GEMINI_API_KEY：残存しているが未使用
+- GEMINI_API_KEY：カバー画像生成用（ワークフローのenv:に追加済み）
 
 ### note投稿方式（JS API方式）✅ 動作確認済み
 - undetected-chromedriver + headless=false でWAFを回避
@@ -59,43 +59,30 @@
 今日のニュース速報｜10秒サマリー
 ① [ニュース1要点1行・数字含む]
 ② [ニュース2要点1行・数字含む]
-
 ---
-
 # [ソース名]が報じたこと         ← H1（大見出し）
-
-## 何が起きたのか                 ← H2（小見出し）
-[250〜350字]
-
-## 数字で見る                     ← H2
-[250〜350字・具体的数字]
-
-## 背景にある構造                 ← H2
-[250〜350字]
-
-# [記事内容に即した社説タイトル]  ← H1（例：「FRBの逡巡は続く。問題は...」）
+## 数字で見る                    ← H2（「何が起きたのか」は不要）
+[300〜400字・具体的数字で事実のみ]
+## 背景にある構造                ← H2
+[300〜400字]
+# [記事内容に即した社説タイトル] ← H1（例：「FRBの逡巡は続く。問題は...」）
 [400〜600字。「私はこう見ている」断定形]
-
-# このニュースで注目すべき銘柄   ← H1
+# このニュースで注目すべき銘柄  ← H1
 銘柄名：[name (ticker)]
 現在株価：[直近株価 or 要確認]
-
-__CHART_0__                       ← yfinanceチャート自動挿入
-
+__CHART_0__                      ← yfinanceチャート自動挿入（銘柄直下）
 [300〜500字 分析]
-
 ---
-
-# [ソース名2]が報じたこと         ← H1
-...（同様）
-
+# [ソース名2]が報じたこと        ← H1
+## 数字で見る
+## 背景にある構造
+# [社説タイトル2]
+# このニュースで注目すべき銘柄
 __CHART_1__
-
+[分析]
 ---
-
 [CTA文（固定）]
-
-__MAGAZINE_EMBED__                ← 有料マガジン埋め込み自動挿入
+__MAGAZINE_EMBED__               ← 有料マガジン埋め込み自動挿入
 ```
 
 ### CTA文（固定・記事末尾）
@@ -111,9 +98,11 @@ https://editor.note.com/notes/n776eaef10c91/edit/
 ## 画像仕様
 
 ### カバー画像（サムネイル）
-- `generate_images.py` が Gemini で生成 → `output/images/cover.png` に保存
-- `post_to_note.py` が `input[type='file'].send_keys()` で自動アップロード
+- **優先①**: `~/Desktop/投資画像/` 内の最新画像を使用（Gemini_Gener...で始まるファイルを優先）
+- **優先②**: GEMINI_API_KEY がある場合は Gemini API で生成 → `output/images/cover.png`
+- `post_to_note.py` がアイキャッチエリアのボタンをクリック → `input[type='file'].send_keys()` でアップロード
 - アップロード後5秒待機
+- upload手順（Seleniumが自動実行）: 「画像をアップロード」クリック → ファイルパスをsend_keys → 保存ボタン
 
 ### 銘柄チャート
 - `generate_images.py` が yfinance + matplotlib で1時間足チャート生成
