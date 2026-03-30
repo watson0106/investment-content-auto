@@ -1,23 +1,21 @@
 """
 ① ニュース収集・ピックアップ
 Bloomberg・日経（Nikkei Asia）・ロイター（スクレイピング）・Yahoo Finance・note の
-リアルタイム情報を収集し、Gemini で最も注目度の高い記事を選定する
+リアルタイム情報を収集し、Claude CLI で最も注目度の高い記事を選定する
 """
 
 from __future__ import annotations
 
 import feedparser
 import requests
+import subprocess
+import os
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 import json
 import re
-import os
-from google import genai
-from google.genai import types
 
 JST = timezone(timedelta(hours=9))
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 HEADERS = {
     "User-Agent": (
@@ -292,11 +290,8 @@ def interleave_by_source(articles: list[dict]) -> list[dict]:
     return result
 
 
-def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summary: str = "") -> list[dict]:
-    """Gemini で投資家にとって最も注目度の高い記事を選定"""
-    client = genai.Client(api_key=GEMINI_API_KEY)
-
-    # ソースごとにインターリーブして順番の偏りをなくす
+def select_top_with_claude(articles: list[dict], top_n: int = 10, history_summary: str = "") -> list[dict]:
+    """Claude CLI で投資家にとって最も注目度の高い記事を選定"""
     articles = interleave_by_source(articles)
 
     article_list = "\n".join(
@@ -319,7 +314,7 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summar
 
 3. **日本人投資家に関連性がある**：日本株・円・日本企業・日本の経済政策に絡むものを優先
 
-4. **3本の記事が互いに異なるテーマ**：同じ日に同じ話題ばかりにならないよう多様性を確保
+4. **{top_n}本が互いに異なるテーマ**：同じ日に同じ話題ばかりにならないよう多様性を確保
 
 【ニュース一覧】
 {article_list}
@@ -327,22 +322,25 @@ def select_top_with_gemini(articles: list[dict], top_n: int = 10, history_summar
 選んだ記事の番号をJSON配列で出力してください（例：[1, 3, 7, 12, 15]）。
 番号のみ、JSONのみ、説明不要。"""
 
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=256),
+        result = subprocess.run(
+            ["claude", "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6"],
+            capture_output=True, text=True, timeout=60, env=env,
         )
-        text = response.text.strip()
-        match = re.search(r"\[[\d,\s]+\]", text)
-        if match:
-            indices = json.loads(match.group())
-            selected = [articles[i - 1] for i in indices if 1 <= i <= len(articles)]
-            if selected:
-                print(f"  Gemini 選定: {len(selected)} 件")
-                return selected[:top_n]
+        if result.returncode == 0:
+            text = result.stdout.strip()
+            match = re.search(r"\[[\d,\s]+\]", text)
+            if match:
+                indices = json.loads(match.group())
+                selected = [articles[i - 1] for i in indices if 1 <= i <= len(articles)]
+                if selected:
+                    print(f"  Claude 選定: {len(selected)} 件")
+                    return selected[:top_n]
+        else:
+            print(f"  [WARN] Claude 選定失敗: {result.stderr[:200]}")
     except Exception as e:
-        print(f"  [WARN] Gemini 選定失敗: {e}")
+        print(f"  [WARN] Claude 選定失敗: {e}")
 
     return articles[:top_n]
 
@@ -379,9 +377,9 @@ def collect_and_rank(top_n: int = 10, history_summary: str = "") -> list[dict]:
     unique = deduplicate(all_articles)
     print(f"  重複除去後: {len(unique)} 件")
 
-    # Gemini で注目度選定
-    print("  Gemini で注目度分析・選定中...")
-    return select_top_with_gemini(unique, top_n=top_n, history_summary=history_summary)
+    # Claude で注目度選定
+    print("  Claude で注目度分析・選定中...")
+    return select_top_with_claude(unique, top_n=top_n, history_summary=history_summary)
 
 
 def main():

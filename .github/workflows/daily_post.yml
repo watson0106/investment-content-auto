@@ -31,13 +31,20 @@ jobs:
       - name: 依存パッケージインストール
         run: pip install -r requirements.txt
 
+      - name: Claude CLI インストール
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Claude CLI 認証セットアップ
+        run: |
+          mkdir -p ~/.claude
+          echo '${{ secrets.CLAUDE_CODE_CREDENTIALS }}' > ~/.claude/.credentials.json
+
       - name: パイプライン実行
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          NOTE_EMAIL:     ${{ secrets.NOTE_EMAIL }}
-          NOTE_PASSWORD:  ${{ secrets.NOTE_PASSWORD }}
-          HEADLESS:       "false"
-          DISPLAY:        ":99"
+          NOTE_EMAIL:  ${{ secrets.NOTE_EMAIL }}
+          NOTE_PASSWORD: ${{ secrets.NOTE_PASSWORD }}
+          HEADLESS:    "false"
+          DISPLAY:     ":99"
         run: |
           Xvfb :99 -screen 0 1280x900x24 &
           sleep 2
