@@ -140,7 +140,7 @@ def clean_inline_markdown(text: str) -> str:
 
 
 def insert_section_with_headings(driver, section_text: str):
-    """セクションテキストを挿入（##見出し行はh2書式を適用）"""
+    """セクションテキストを挿入（# → h1、## → h2 書式を適用）"""
     lines = section_text.split('\n')
     batch: list[str] = []
 
@@ -154,16 +154,17 @@ def insert_section_with_headings(driver, section_text: str):
         batch.clear()
 
     for line in lines:
-        m = re.match(r'^#{1,3}\s+(.*)', line)
+        m = re.match(r'^(#{1,3})\s+(.*)', line)
         if m:
             flush_batch()
-            heading_text = clean_inline_markdown(m.group(1).strip())
-            # 見出しテキストを挿入 → h2書式を適用 → 改行して通常テキストに戻す
+            level = len(m.group(1))
+            heading_text = clean_inline_markdown(m.group(2).strip())
+            tag = 'h1' if level == 1 else 'h2'
             driver.execute_script(
                 "document.execCommand('insertText', false, arguments[0])", heading_text
             )
             time.sleep(0.1)
-            driver.execute_script("document.execCommand('formatBlock', false, 'h2')")
+            driver.execute_script(f"document.execCommand('formatBlock', false, '{tag}')")
             time.sleep(0.1)
             driver.execute_script("document.execCommand('insertText', false, '\\n')")
             driver.execute_script("document.execCommand('formatBlock', false, 'p')")
@@ -172,6 +173,110 @@ def insert_section_with_headings(driver, section_text: str):
             batch.append(clean_inline_markdown(line))
 
     flush_batch()
+
+
+def insert_magazine_embed(driver, magazine_url: str):
+    """有料マガジンURLを note.com の埋め込みブロックとして挿入"""
+    try:
+        editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
+        editor_el.click()
+        time.sleep(0.5)
+
+        # カーソルを末尾に移動して空行を作る
+        driver.execute_script("window.getSelection().collapseToEnd()")
+        driver.execute_script("document.execCommand('insertText', false, '\\n')")
+        time.sleep(0.8)
+
+        # ＋ボタン（追加ブロックメニュー）を探す
+        add_btn = None
+        selectors = [
+            "[class*='AddButton']",
+            "[class*='add-button']",
+            "[class*='addButton']",
+            "button[aria-label*='追加']",
+            "button[data-tooltip*='追加']",
+            "[class*='insertButton']",
+        ]
+        for sel in selectors:
+            els = driver.find_elements(By.CSS_SELECTOR, sel)
+            if els:
+                add_btn = els[-1]  # 末尾（最新行）のボタンを使う
+                break
+
+        if add_btn:
+            driver.execute_script("arguments[0].scrollIntoView(true);", add_btn)
+            driver.execute_script("arguments[0].click();", add_btn)
+            time.sleep(1.0)
+
+            # 埋め込みボタンを探してクリック
+            embed_btn = None
+            for xpath in [
+                "//*[contains(text(),'埋め込み')]",
+                "//*[contains(@aria-label,'埋め込み')]",
+                "//*[contains(@title,'埋め込み')]",
+            ]:
+                els = driver.find_elements(By.XPATH, xpath)
+                if els:
+                    embed_btn = els[0]
+                    break
+
+            if embed_btn:
+                driver.execute_script("arguments[0].click();", embed_btn)
+                time.sleep(1.0)
+
+                # URL入力欄を探して入力
+                url_input = None
+                for sel in ["input[type='url']", "input[placeholder*='URL']",
+                            "input[placeholder*='url']", "input[placeholder*='https']"]:
+                    els = driver.find_elements(By.CSS_SELECTOR, sel)
+                    if els:
+                        url_input = els[0]
+                        break
+
+                if url_input:
+                    url_input.clear()
+                    url_input.send_keys(magazine_url)
+                    time.sleep(0.5)
+
+                    # 「適用」ボタンをクリック
+                    apply_btn = None
+                    for xpath in [
+                        "//button[contains(.,'適用')]",
+                        "//button[contains(.,'OK')]",
+                        "//button[contains(.,'確定')]",
+                    ]:
+                        els = driver.find_elements(By.XPATH, xpath)
+                        if els:
+                            apply_btn = els[0]
+                            break
+
+                    if apply_btn:
+                        driver.execute_script("arguments[0].click();", apply_btn)
+                        time.sleep(3)
+                        print(f"  マガジン埋め込み完了: {magazine_url}")
+                        return
+                    else:
+                        from selenium.webdriver.common.keys import Keys as K
+                        url_input.send_keys(K.RETURN)
+                        time.sleep(3)
+                        print(f"  マガジン埋め込み（Enterで適用）: {magazine_url}")
+                        return
+
+        # フォールバック: URLをテキストとして直接ペースト（note.comが自動embed化する場合がある）
+        print(f"  [WARN] ＋ボタン見つからず。URLをテキストとして挿入: {magazine_url}")
+        driver.execute_script(
+            "document.execCommand('insertText', false, arguments[0])", magazine_url + "\n"
+        )
+        time.sleep(2)
+
+    except Exception as e:
+        print(f"  [WARN] マガジン埋め込み失敗: {e}")
+        try:
+            driver.execute_script(
+                "document.execCommand('insertText', false, arguments[0])", magazine_url + "\n"
+            )
+        except Exception:
+            pass
 
 
 def set_editor_content(driver, element, text: str):
@@ -297,50 +402,49 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         set_react_textarea(driver, title_el, title)
         time.sleep(1)
 
-        # カバー画像（アイキャッチ）を設定
+        # カバー画像（サムネイル）を設定
         if not cover_path:
             cover_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "cover_image.png"))
         if cover_path and os.path.exists(cover_path):
-            print("  カバー画像を設定中...")
+            abs_cover = os.path.abspath(cover_path)
+            print(f"  カバー画像を設定中: {os.path.basename(abs_cover)}")
             try:
-                # アイキャッチ画像アップロードボタンを探してクリック
-                eyecatch_btn = driver.find_elements(By.XPATH,
-                    "//*[contains(@class,'eyecatch') or contains(text(),'アイキャッチ') or contains(@aria-label,'アイキャッチ')]"
-                )
-                if not eyecatch_btn:
-                    # file inputを直接探す
-                    file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
-                    if file_inputs:
-                        file_inputs[0].send_keys(cover_path)
-                        time.sleep(3)
-                        # トリミングダイアログが出た場合は確定ボタンを押す
-                        try:
-                            confirm = driver.find_element(By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'OK')]")
-                            confirm.click()
-                            time.sleep(2)
-                        except Exception:
-                            pass
-                        print("  カバー画像 設定完了")
+                # JS でhidden な file input を表示してから send_keys
+                driver.execute_script("""
+                    var inputs = document.querySelectorAll('input[type="file"]');
+                    inputs.forEach(function(el) {
+                        el.style.display = 'block';
+                        el.style.visibility = 'visible';
+                        el.style.opacity = '1';
+                        el.style.width = '1px';
+                        el.style.height = '1px';
+                    });
+                """)
+                time.sleep(0.5)
+                file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
+                if file_inputs:
+                    file_inputs[0].send_keys(abs_cover)
+                    time.sleep(5)  # アップロード完了待ち（5秒）
+                    # トリミングダイアログが出た場合は確定ボタンを押す
+                    try:
+                        confirm = WebDriverWait(driver, 5).until(EC.element_to_be_clickable(
+                            (By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'保存') or contains(.,'OK')]")
+                        ))
+                        driver.execute_script("arguments[0].click();", confirm)
+                        time.sleep(2)
+                    except Exception:
+                        pass
+                    print("  カバー画像 設定完了")
                 else:
-                    eyecatch_btn[0].click()
-                    time.sleep(2)
-                    file_inputs = driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
-                    if file_inputs:
-                        file_inputs[-1].send_keys(cover_path)
-                        time.sleep(3)
-                        try:
-                            confirm = driver.find_element(By.XPATH, "//button[contains(.,'決定') or contains(.,'完了') or contains(.,'OK')]")
-                            confirm.click()
-                            time.sleep(2)
-                        except Exception:
-                            pass
-                        print("  カバー画像 設定完了")
+                    print("  [WARN] file input 見つからず")
             except Exception as e:
                 print(f"  [WARN] カバー画像設定失敗: {e}")
 
-        # __IMAGE_n__ プレースホルダーで本文を分割して順番に挿入
+        MAGAZINE_URL = "https://note.com/kawasewatson0106/m/me3bdb7d529fc"
+
+        # __IMAGE_n__, __MAGAZINE_EMBED__ プレースホルダーで本文を分割して順番に挿入
         body_text = body[:50000]
-        parts = re.split(r'(__IMAGE_\d+__)', body_text)
+        parts = re.split(r'(__IMAGE_\d+__|__MAGAZINE_EMBED__)', body_text)
 
         print(f"  本文入力中（{len(body_text)} 文字）...")
         editor_el = wait.until(EC.presence_of_element_located(
@@ -353,7 +457,8 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
 
         img_count = 0
         for part in parts:
-            m2 = re.match(r'__IMAGE_(\d+)__', part.strip())
+            stripped = part.strip()
+            m2 = re.match(r'__IMAGE_(\d+)__', stripped)
             if m2:
                 idx = int(m2.group(1))
                 if idx < len(image_paths) and image_paths[idx]:
@@ -367,8 +472,11 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
                         time.sleep(0.3)
                         print(f"    ✓ 画像{img_count+1} 挿入完了")
                     img_count += 1
-            elif part.strip():
-                insert_section_with_headings(driver, part.strip())
+            elif stripped == "__MAGAZINE_EMBED__":
+                print("  マガジン埋め込みを挿入中...")
+                insert_magazine_embed(driver, MAGAZINE_URL)
+            elif stripped:
+                insert_section_with_headings(driver, stripped)
                 time.sleep(0.3)
 
         time.sleep(2)
