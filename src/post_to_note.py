@@ -123,19 +123,79 @@ def login(driver, wait: WebDriverWait):
 
 
 def paste_image_from_clipboard(driver, editor_el, image_path: str) -> bool:
-    """osascriptでクリップボードに画像をセットしてエディタにペースト"""
+    """クリップボードに画像をセットしてエディタにペースト（Mac: osascript / Linux: xclip）"""
+    abs_path = os.path.abspath(image_path)
+    import platform
     try:
-        abs_path = os.path.abspath(image_path)
-        subprocess.run(
-            ["osascript", "-e", f'set the clipboard to POSIX file "{abs_path}"'],
-            check=True
-        )
-        time.sleep(0.8)
-        editor_el.send_keys(Keys.COMMAND + "v")
+        if platform.system() == "Darwin":
+            subprocess.run(
+                ["osascript", "-e", f'set the clipboard to POSIX file "{abs_path}"'],
+                check=True
+            )
+            time.sleep(0.8)
+            editor_el.send_keys(Keys.COMMAND + "v")
+        else:
+            # Linux CI: xclip でクリップボードに画像をセット、Ctrl+V でペースト
+            result = subprocess.run(
+                ["xclip", "-selection", "clipboard", "-t", "image/png", "-i", abs_path],
+                check=True, capture_output=True
+            )
+            time.sleep(0.5)
+            editor_el.send_keys(Keys.CONTROL + "v")
         time.sleep(4)  # アップロード完了を待つ
         return True
+    except FileNotFoundError:
+        # xclip が入っていない場合は JS ドロップ方式にフォールバック
+        return _paste_image_via_js(driver, editor_el, abs_path)
     except Exception as e:
         print(f"  [WARN] 画像ペースト失敗: {e}")
+        return _paste_image_via_js(driver, editor_el, abs_path)
+
+
+def _paste_image_via_js(driver, editor_el, abs_path: str) -> bool:
+    """JavaScript DataTransfer drop イベントで画像を挿入する"""
+    try:
+        import base64
+        with open(abs_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        ext = os.path.splitext(abs_path)[1].lower().replace(".", "") or "png"
+        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(ext, "image/png")
+
+        result = driver.execute_async_script(f"""
+            var done = arguments[arguments.length - 1];
+            var b64 = "{b64}";
+            var mime = "{mime}";
+            var byteChars = atob(b64);
+            var byteArr = new Uint8Array(byteChars.length);
+            for (var i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+            var blob = new Blob([byteArr], {{type: mime}});
+            var fd = new FormData();
+            fd.append("image", blob, "chart.{ext}");
+            fetch("/api/v1/images", {{
+                method: "POST",
+                credentials: "include",
+                headers: {{"x-requested-with": "XMLHttpRequest"}},
+                body: fd
+            }})
+            .then(function(r) {{ return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }}); }})
+            .catch(function(e) {{ done({{error: e.toString()}}); }});
+        """)
+        if result and result.get("status") in (200, 201):
+            import json as _json
+            data = _json.loads(result["text"])
+            img_url = data.get("data", {}).get("url") or data.get("url")
+            if img_url:
+                driver.execute_script(
+                    "document.execCommand('insertHTML', false, arguments[0])",
+                    f'<img src="{img_url}"><br>'
+                )
+                time.sleep(2)
+                print(f"    JS upload 成功: {img_url[:60]}")
+                return True
+        print(f"  [WARN] JS upload: status={result.get('status') if result else 'None'} {result.get('text','')[:80]}")
+        return False
+    except Exception as e:
+        print(f"  [WARN] JS 画像挿入失敗: {e}")
         return False
 
 
@@ -354,9 +414,41 @@ def _upload_cover_image(driver, abs_cover: str, note_key: str):
     print("  [WARN] カバー画像の設定に失敗しました（全アプローチ試行済み）")
 
 
+def _close_any_modal(driver):
+    """開いているモーダル・オーバーレイを閉じる"""
+    try:
+        from selenium.webdriver.common.keys import Keys as _Keys
+        # ESCキーでモーダルを閉じる
+        driver.find_element(By.TAG_NAME, 'body').send_keys(_Keys.ESCAPE)
+        time.sleep(0.8)
+    except Exception:
+        pass
+    # 閉じるボタンがあればクリック
+    for xpath in ["//button[contains(.,'閉じる')]", "//button[@aria-label='閉じる']",
+                  "//button[contains(.,'キャンセル')]", "//button[contains(.,'×')]"]:
+        try:
+            btns = driver.find_elements(By.XPATH, xpath)
+            for btn in btns:
+                if btn.is_displayed():
+                    driver.execute_script("arguments[0].click();", btn)
+                    time.sleep(0.5)
+        except Exception:
+            pass
+    # ReactModal overlay が消えるまで待つ
+    for _ in range(5):
+        overlays = driver.find_elements(By.CSS_SELECTOR, ".ReactModal__Overlay, [class*='MessageModal']")
+        if not overlays:
+            break
+        time.sleep(0.5)
+
+
 def insert_magazine_embed(driver, magazine_url: str):
     """有料マガジンURLを note.com の埋め込みブロックとして挿入"""
     try:
+        # まず開いているモーダルを全て閉じる
+        _close_any_modal(driver)
+        time.sleep(0.5)
+
         editor_el = driver.find_element(By.CSS_SELECTOR, ".ProseMirror")
         editor_el.click()
         time.sleep(0.5)
