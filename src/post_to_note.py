@@ -296,7 +296,7 @@ def insert_url_as_embed(driver, url: str):
 
 
 def insert_section_with_headings(driver, section_text: str):
-    """セクションテキストを挿入（# → h1、## → h2、### → h3、URL単独行 → 埋め込み）"""
+    """セクションテキストを挿入（# → h2大見出し、## → h3小見出し、### → h3小見出し、URL単独行 → 埋め込み）"""
     # 3連続以上の改行を2連続に圧縮してスペース過多を防ぐ
     section_text = re.sub(r'\n{3,}', '\n\n', section_text)
     lines = section_text.split('\n')
@@ -323,8 +323,8 @@ def insert_section_with_headings(driver, section_text: str):
         m = re.match(r'^(#{1,3})\s+(.*)', line)
         if m:
             flush_batch()
-            level = len(m.group(1))  # 1 → h1、2 → h2、3 → h3
-            heading_tag = {1: 'h1', 2: 'h2', 3: 'h3'}[level]
+            level = len(m.group(1))  # 1 → h2（大見出し）、2以上 → h3（小見出し）
+            heading_tag = 'h2' if level == 1 else 'h3'
             heading_text = clean_inline_markdown(m.group(2).strip())
             # 見出しテキストを挿入 → 書式を適用 → 改行して通常テキストに戻す
             driver.execute_script(
