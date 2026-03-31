@@ -35,7 +35,7 @@ def clean_article(text: str) -> str:
 
 def run_claude(prompt: str, model: str = "claude-opus-4-6", timeout: int = 600) -> str:
     """Claude CLIを呼び出してテキストを返す"""
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE" and not k.startswith("CLAUDE_CODE_")}
     # cronはPATHが最小限のため /opt/homebrew/bin を先頭に追加（node等のため）
     homebrew_path = "/opt/homebrew/bin:/usr/local/bin"
     env["PATH"] = homebrew_path + ":" + env.get("PATH", "/usr/bin:/bin")
@@ -386,10 +386,9 @@ def build_news_section_prompt(news: dict, section_num: int = 1) -> str:
 ### [銘柄名（証券コード or ティッカー）]
 
 - 本日の株価（土日は「週明け注目水準（直近終値）：〇〇円前後」）
-- このニュースとこの銘柄の直接的な関係を1文で
-- 需給・業績・センチメントのどのルートで株価に波及するか
-- 短期（当日〜1週間）の動き見立てを具体的な価格帯・数値で
-（700字程度）
+- このニュースとこの銘柄の関係・株価への影響ルートを簡潔に（200〜250字）
+- 「具体的なエントリー水準・シナリオ・売買判断は有料noteで解説している」という一言で締める
+（300字以内。詳細な価格分析・シナリオは書かない。有料noteへの興味を引くフックにとどめる）
 
 【執筆ルール】
 - 目標文字数：合計2000字（絶対に2000字を下回らないこと。足りない場合は各パートをさらに掘り下げて補う）
