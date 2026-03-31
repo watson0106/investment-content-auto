@@ -1,9 +1,9 @@
 """
-② 記事執筆（2本）
+② 記事執筆（1本・2ニュース構成）
 仕様: note自動投稿パイプライン 運用ルール に準拠
-- 2本の記事を2つの独立したトピックで執筆
-- 7セクション構成
-- 有料マガジンへの誘導
+- 2つのニューストピックをまとめた1本の記事を執筆
+- タイトル固定：「新聞より早くてわかりやすい今日の投資ニュース速報｜M/D」
+- 構成: 30秒サマリー → ニュース①（3パート） → ニュース②（3パート）
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import datetime
+import urllib.request
 
 MAGAZINE_URL = "https://note.com/kawasewatson0106/m/me3bdb7d529fc"
 JST = datetime.timezone(datetime.timedelta(hours=9))
@@ -35,6 +36,9 @@ def clean_article(text: str) -> str:
 def run_claude(prompt: str, model: str = "claude-opus-4-6", timeout: int = 600) -> str:
     """Claude CLIを呼び出してテキストを返す"""
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    # cronはPATHが最小限のため /opt/homebrew/bin を先頭に追加（node等のため）
+    homebrew_path = "/opt/homebrew/bin:/usr/local/bin"
+    env["PATH"] = homebrew_path + ":" + env.get("PATH", "/usr/bin:/bin")
     # cronはPATHが最小限のため絶対パスを優先して探す
     claude_cmd = None
     for candidate in ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"]:
@@ -47,14 +51,21 @@ def run_claude(prompt: str, model: str = "claude-opus-4-6", timeout: int = 600) 
     if not claude_cmd:
         print("  [WARN] Claude CLI が見つかりません")
         return ""
-    result = subprocess.run(
-        [claude_cmd, "-p", prompt, "--output-format", "text", "--model", model],
-        capture_output=True, text=True, timeout=timeout, env=env,
-    )
-    if result.returncode == 0 and result.stdout.strip():
-        return result.stdout.strip()
-    print(f"  [WARN] Claude CLI 失敗: {result.stderr[:200]}")
-    return ""
+    try:
+        result = subprocess.run(
+            [claude_cmd, "-p", prompt, "--output-format", "text", "--model", model],
+            capture_output=True, text=True, timeout=timeout, env=env,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        print(f"  [WARN] Claude CLI 失敗: {result.stderr[:200]}")
+        return ""
+    except subprocess.TimeoutExpired:
+        print(f"  [WARN] Claude CLI タイムアウト（{timeout}s）")
+        return ""
+    except Exception as e:
+        print(f"  [WARN] Claude CLI エラー: {e}")
+        return ""
 
 
 
@@ -64,10 +75,13 @@ def get_realtime_price(code: str, is_jp: bool = True) -> str | None:
         import yfinance as yf
         ticker_str = f"{code}.T" if is_jp else code
         ticker = yf.Ticker(ticker_str)
-        hist = ticker.history(period="2d")
+        hist = ticker.history(period="5d")
         if hist.empty:
             return None
-        price = hist["Close"].iloc[-1]
+        close_series = hist["Close"].dropna()
+        if close_series.empty:
+            return None
+        price = close_series.iloc[-1]
         if is_jp:
             return f"{price:,.0f}円"
         else:
@@ -88,12 +102,19 @@ def generate_stock_chart(code: str, is_jp: bool = True) -> str | None:
         plt.rcParams['font.family'] = ['Hiragino Sans', 'Hiragino Maru Gothic Pro', 'sans-serif']
 
         ticker_str = f"{code}.T" if is_jp else code
-        df = yf.Ticker(ticker_str).history(period="1mo")
-        if df.empty or len(df) < 5:
+        df = yf.Ticker(ticker_str).history(period="3mo")
+        if df.empty:
             return None
+        # NaN行を除去してからチェック
+        df = df.dropna(subset=["Open", "High", "Low", "Close"])
+        if len(df) < 5:
+            return None
+        # 直近1ヶ月分に絞る
+        df = df.tail(22)
 
         # mplfinanceはtz-naiveなインデックスを要求
-        df.index = df.index.tz_localize(None)
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
 
         os.makedirs("output/charts", exist_ok=True)
         chart_path = f"output/charts/{code}_chart.png"
@@ -195,6 +216,24 @@ def inject_stock_charts(draft: str) -> tuple[str, list[str]]:
     return '\n'.join(new_lines), image_paths
 
 
+def download_news_image(image_url: str, section_num: int) -> str | None:
+    """ニュースソースの画像URLをダウンロードしてローカルに保存する"""
+    if not image_url:
+        return None
+    try:
+        os.makedirs("output/images", exist_ok=True)
+        ext = "jpg" if image_url.lower().endswith((".jpg", ".jpeg")) else "png"
+        path = f"output/images/news_{section_num}.{ext}"
+        req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp, open(path, "wb") as f:
+            f.write(resp.read())
+        print(f"  ニュース引用画像ダウンロード: {path}")
+        return path
+    except Exception as e:
+        print(f"  [WARN] ニュース画像ダウンロード失敗: {e}")
+        return None
+
+
 def inject_realtime_prices(draft: str) -> str:
     """記事内の銘柄コードをもとにリアルタイム株価を取得してClaudeで注入する"""
     # 日本株コード（4桁 or 285Aなど英数混在） 例：（8035）（285A）
@@ -273,7 +312,7 @@ def select_topics(articles: list[dict]) -> tuple[dict, dict]:
   "topic2": {{"index": <番号>, "title": "<ニュースタイトル>"}}
 }}"""
 
-    text = run_claude(prompt, model="claude-sonnet-4-6", timeout=120)
+    text = run_claude(prompt, model="claude-sonnet-4-6", timeout=180)
     if text:
         m = re.search(r'\{[\s\S]+\}', text)
         if m:
@@ -285,30 +324,39 @@ def select_topics(articles: list[dict]) -> tuple[dict, dict]:
             except Exception as e:
                 print(f"  [WARN] トピック選定パース失敗: {e}")
 
-    # フォールバック
-    return articles[0], articles[min(5, len(articles)-1)]
+    # フォールバック：海外ソース × 日本ソースで異なるトピックを選ぶ
+    jp_sources = {"Yahoo Finance Japan", "Yahoo Japan トップ", "NHK 経済", "日経新聞", "ロイター"}
+    overseas = [a for a in articles if a.get("source") not in jp_sources]
+    domestic = [a for a in articles if a.get("source") in jp_sources]
+    topic1 = overseas[0] if overseas else articles[0]
+    topic2 = domestic[0] if domestic else articles[min(1, len(articles)-1)]
+    if topic1 is topic2:
+        topic2 = articles[min(1, len(articles)-1)]
+    print(f"  [INFO] フォールバックトピック: [{topic1['source']}] / [{topic2['source']}]")
+    return topic1, topic2
 
 
-def build_article_prompt(news: dict) -> str:
-    """記事執筆プロンプト"""
+def get_weekday_note() -> str:
+    """曜日別の執筆注意文を返す"""
+    today = datetime.datetime.now(JST)
+    weekday = today.weekday()
+    if weekday == 5:
+        return "【執筆曜日：土曜日】読者が記事を読むのは日曜〜月曜の朝。「金曜引け後に〜する」など市場がすでに閉じた前提の行動指針は禁止。「週明け月曜の寄り付きで〜を確認する」「月曜の値動き次第で〜」など月曜を見越した視点で書くこと。"
+    elif weekday == 6:
+        return "【執筆曜日：日曜日】読者が記事を読むのは日曜〜月曜の朝。市場は閉じており週明けまで売買できない。「金曜引け後の水準でポジションを組む」など過去の市場動作を前提にした行動指針は禁止。「月曜の寄り付き値を確認してから〜」「週明けの動き次第で〜」など月曜に読者が取れる行動を軸に書くこと。"
+    else:
+        return f"【執筆曜日：{'月火水木金'[weekday]}曜日】当日〜翌日の市場動向を基準にした行動指針でOK。"
+
+
+def build_news_section_prompt(news: dict, section_num: int = 1) -> str:
+    """1ニュース分のセクション（3パート・合計2000字程度）の執筆プロンプト"""
     source = news.get('source', 'メディア')
     title_en = news['title']
     summary = news.get('summary', '')[:400]
+    weekday_note = get_weekday_note()
+    num_prefix = "①" if section_num == 1 else "②"
 
-    today = datetime.datetime.now(JST)
-    weekday = today.weekday()  # 0=月, 5=土, 6=日
-    if weekday == 5:
-        weekday_note = "【執筆曜日：土曜日】読者が記事を読むのは日曜〜月曜の朝。「金曜引け後に〜する」など市場がすでに閉じた前提の行動指針は禁止。「週明け月曜の寄り付きで〜を確認する」「月曜の値動き次第で〜」など月曜を見越した視点で書くこと。"
-    elif weekday == 6:
-        weekday_note = "【執筆曜日：日曜日】読者が記事を読むのは日曜〜月曜の朝。市場は閉じており週明けまで売買できない。「金曜引け後の水準でポジションを組む」など過去の市場動作を前提にした行動指針は禁止。「月曜の寄り付き値を確認してから〜」「週明けの動き次第で〜」など月曜に読者が取れる行動を軸に書くこと。"
-    else:
-        weekday_note = f"【執筆曜日：{'月火水木金'[weekday]}曜日】当日〜翌日の市場動向を基準にした行動指針でOK。"
-
-    return f"""note.com向けの投資解説記事を執筆してください。
-
-【このnoteのコンセプト（執筆方針として内部的に参照すること。記事本文には書かない）】
-スイング・デイトレーダーのための朝の必読ニュース。
-世界の動きが日本株にどう波及するかを毎朝解説し、情報収集で終わらせず実際の売買に活かす視点を提供する。
+    return f"""note.com向けの投資解説セクションを執筆してください。対象読者はスイング・デイトレーダー。
 
 {weekday_note}
 
@@ -317,135 +365,56 @@ def build_article_prompt(news: dict) -> str:
 タイトル: {title_en}
 概要: {summary}
 
----
+【構成（この順番・このH2/H3で厳守）】
 
-【出力フォーマット（必ず守ること）】
-1行目: TITLE: [選定したタイトル]
-2行目以降: 記事本文（タイトルを本文中に繰り返さない）
-最終行: TOPIC_TAGS: [タグ1],[タグ2]
+## {num_prefix}{source}が報じたこと
 
----
+「{source}によると、〜」という書き出しで開始。
+客観的・解説的な文体で、このニュースの概要・背景・意味合いを丁寧に解説する（1000字程度）。
+専門用語は使ってもよいが、初めて出てくるときは一言で説明を加えること。
+複数の切り口がある場合はH3で区切って展開する。
 
-【タイトル選定ルール】
-候補を3本考え、以下の基準で1本を選ぶ：
-1. 数字を含む（「〇〇円」「〇〇%」「3つの」など）
-2. 読者の不安または好奇心を刺激するが、答え・結論はタイトルで明かさない
-   良い例：「PS5値上げで最も恩恵を受ける『半導体銘柄』の正体」「ダウ800ドル暴落――5週連続安が示す3つの危険信号」
-   悪い例：「PS5値上げでソニー株は買いか――答えはノーだ」（タイトルで結論を出してしまっている）
-3. 30文字以内
-禁止：「〜について」「〜を解説」「〜とは」で終わるタイトル、タイトルで結論・答えを明かすもの
+## [筆者の意見をH2見出しそのものに一言で書く。例：「この動きは○○の前兆だと私は見ている」]
 
----
-
-【記事本文構成（必ずこの順番・H2/H3の使い分けで書くこと）】
-
-[リード文（100〜150字）]
-冒頭3行で読者を引き込むフック。以下のいずれかのパターンを使うこと：
-- 逆説型：「〜と思われているが、実は逆だ」
-- 数字型：「〇〇円、〇〇%――この数字が示す本当の意味とは」
-- 問い型：「あなたはこのニュースの本質を読めているか」
-
-## {source}が報じたこと
-
-「{source}によると、〜」という書き出しで始め、このニュースの概要を800〜1000字でわかりやすく解説する。
-複数の切り口がある場合は以下のように H3 で区切る：
-
-### [切り口1の見出し]
-（本文を段落で展開）
-
-### [切り口2の見出し]
-（本文を段落で展開）
-
-## [筆者の結論をそのままH2見出しにする。例：「この上昇は3ヶ月以内に反転すると考える理由」]
-
-結論をH2見出しに入れ、その根拠を1200〜1500字で展開する。
-複数の観点は H3 で区切る：
-
-### [観点1の見出し]
-### [観点2の見出し]
-
-## 行動の考え方
-
-600〜800字。断定推奨禁止。複数パターンは H3 で区切る。
+上のH2見出しに意見を一言で入れて、本文でその根拠を展開（700字程度）。
+ブロガー口調（「〜だと思う」「〜と私は見ている」など）で、なぜそう考えるか理由・根拠を具体的に書く。
 
 ## このニュースで注目すべき銘柄
 
-このニュースの影響を最も受けるセクターを特定し、売買代金上位の代表銘柄を1〜2銘柄取り上げる。
-銘柄ごとに以下の形式で書く：
+このニュースの影響を最も受ける銘柄を1つだけ取り上げる。
 
 ### [銘柄名（証券コード or ティッカー）]
 
-- 本日の株価（土日の場合は「週明けの注目水準：〇〇円前後」）
-- このニュースとこの銘柄の因果関係を明確に記述する
-
-【銘柄分析の質の基準】
-「影響がありそう」という表面的な記述は禁止。
-以下の問いに答える形で分析を書くこと：
-1. 今日このニュースがこの銘柄に与える最も直接的な影響は何か？
-2. その影響は株価にどう波及するか？（需給・業績・センチメントのいずれのルートか）
-3. 短期的（当日〜1週間）に株価がどう動きやすいか、客観的なエビデンス（過去の類似相場・相関データ・空売り比率・オプションのPCRなど）を根拠として示す
-
-【分析例の水準（参考）】
-「三菱商事×原油高」の場合：「影響があります」ではなく——
-「中東情勢の長期化観測が強まれば、原油の供給制約は構造的なものとなる。三菱商事の資源セグメント利益は原油1バレルあたりの単価と相関が高く、WTIが80ドル台から90ドルに上昇した場合の増益幅は過去のIR資料から試算できる。加えて、同社の空売り比率が直近で〇%程度と低水準にあることから、買い圧力に対する需給抵抗は小さい。週明けのギャップアップ後、〇〇円〜〇〇円ゾーンが上値の節目として意識されやすい」——このレベルの具体性を目指す。
-
-この銘柄セクションの末尾に、以下の構成で有料マガジンへの誘導文を自然につなげる：
-
----
-
-（記事の論旨に合わせた1〜2段落の誘導文。以下は構成の参考）
-
-「この銘柄に注目できたとして、それだけでは利益にならない。同じ情報を見ている参加者は無数にいる。差がつくのはエントリータイミングと損切り・利確の設計だ。」
-
-「そのための具体的な判断軸を毎週まとめているのが以下の有料マガジンだ。読み流す情報ではなく、明日の売買に使える視点だけを届けている。」
-
-{MAGAZINE_URL}
-
-（※URLは必ず単独の行に置くこと。誘導文テキスト内にURLを埋め込まない）
-
----
-
-【トピックタグ選定】
-以下のリストから最も関連する2つを選ぶ：
-為替 / FRB / 金利 / 決算 / マクロ経済 / エネルギー / 半導体 / 日銀 / 円安 / 円高
-→ 最終行に「TOPIC_TAGS: タグ1,タグ2」の形式で出力
-
----
+- 本日の株価（土日は「週明け注目水準（直近終値）：〇〇円前後」）
+- このニュースとこの銘柄の直接的な関係を1文で
+- 需給・業績・センチメントのどのルートで株価に波及するか
+- 短期（当日〜1週間）の動き見立てを具体的な価格帯・数値で
+（700字程度）
 
 【執筆ルール】
-- 目標文字数：5000字程度
-- 対象読者：スイング・デイトレーダー（売買に使える視点を求めている）
-- 文体：ブロガー口調（断定的すぎず、読者と対話する感覚）
-- 個人プロフィール（投資歴〇年・〇代など）は一切記載しない
-- H2 はセクションの大見出し、H3 はセクション内の小見出しとして使い分ける
-- 改行・空行は意味のまとまりで自然に入れる（1文ごとの機械的な改行は禁止）
-- 段落は3〜5文を目安にまとめる
-- 太字は重要なキーワードのみに限定する
-- 絵文字は使用禁止（URLの前後も含めて）
-- 数字は徹底的に具体的に（「大幅」ではなく「+3.5%」）
-- タイムリーな数値は「〜と報じられています」「〜とされています」と表現
-- 「おわりに」という見出しは使わない。銘柄セクション末尾から自然に誘導文につなげる
-- 記事本文のみ出力（前置き・後記・加筆まとめ不要）"""
+- 目標文字数：合計2000字（絶対に2000字を下回らないこと。足りない場合は各パートをさらに掘り下げて補う）
+- 「行動の考え方」「おわりに」見出し禁止
+- 絵文字禁止・個人プロフィール禁止
+- 数字は具体的に（「大幅」ではなく「+3.5%」）
+- 1段落は最大3〜4文。それ以上になる場合は必ず段落を分けて改行を入れる（スマホ読者向け）
+- 重要な結論・インパクトのある数字（例：4倍、750億円、+12%など）は必ず**太字**で強調する
+- 各段落の冒頭か末尾に結論・数字を置き、斜め読みでも内容が伝わるようにする
+- 記事本文のみ出力（前置き・後記・コメント不要）
+- 有料マガジンへの誘導文・URLはこのセクション内に一切書かない（記事全体の末尾に別途追加される）
+- 末尾: TOPIC_TAGS: タグ1,タグ2（為替/FRB/金利/決算/マクロ経済/エネルギー/半導体/日銀/円安/円高 から2つ）"""
 
 
-def write_article(news: dict, article_num: int) -> dict:
-    """1本の記事を執筆して返す"""
-    prompt = build_article_prompt(news)
+def write_news_section(news: dict, section_num: int) -> dict:
+    """1ニュース分のセクションを執筆して返す"""
+    prompt = build_news_section_prompt(news, section_num)
 
-    print(f"  Claude CLI で記事{article_num}執筆中...")
+    print(f"  Claude CLI でセクション{section_num}執筆中...")
     draft = run_claude(prompt, model="claude-opus-4-6", timeout=600)
 
     if not draft:
-        raise RuntimeError(f"記事{article_num}の執筆に失敗しました")
+        raise RuntimeError(f"セクション{section_num}の執筆に失敗しました")
 
     print(f"  執筆完了（{len(draft)} 文字）")
-
-    # TITLE: 抽出
-    title = ""
-    title_match = re.search(r'^TITLE:\s*(.+)$', draft, re.MULTILINE)
-    if title_match:
-        title = title_match.group(1).strip()
-        draft = re.sub(r'^TITLE:\s*.+\n?', '', draft, count=1, flags=re.MULTILINE).strip()
 
     # TOPIC_TAGS: 抽出
     topic_tags = []
@@ -454,65 +423,6 @@ def write_article(news: dict, article_num: int) -> dict:
         raw = [t.strip() for t in tags_match.group(1).split(',')]
         topic_tags = [t for t in raw if t in TOPIC_TAGS_OPTIONS][:2]
         draft = re.sub(r'TOPIC_TAGS:\s*.+$', '', draft, flags=re.MULTILINE).strip()
-
-    # 4000字未満なら補強
-    if len(draft) < 4000:
-        print(f"  [WARN] 記事{article_num}が{len(draft)}文字（4000字未満）→ 補強中...")
-        source = news.get('source', 'メディア')
-
-        if len(draft) >= 1500:
-            # 既存の記事を展開（構成・主張は変えずに加筆）
-            supplement_prompt = f"""以下の投資記事を加筆して5000字程度にしてください。
-
-【加筆ルール】
-- 現在の記事の内容・構成・主張は一切変えない
-- 各セクションに根拠・データ・事例を追記して文字数を増やす
-- 「このニュースで注目すべき銘柄」の銘柄分析に具体的な株価水準・過去の相関・需給データを追加
-- 「おわりに」「今週の注目指標」見出し禁止
-- コメント・まとめ・前置き不要。加筆後の記事全文のみ出力
-
-【現在の記事（{len(draft)}文字）】
-{draft}"""
-            supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=300)
-        else:
-            # 極端に短い場合は完全再生成
-            news_title = news.get('title', '')
-            news_summary = news.get('summary', '')
-            supplement_prompt = f"""以下のニュースを題材に、投資ブログ記事を5000字程度で執筆してください。
-
-【ニュース】
-ソース: {source}
-タイトル: {news_title}
-概要: {news_summary}
-
-【出力ルール】
-- 1行目: TITLE: [記事タイトル]（ニュースの核心を突いた逆説/数字/問い型の30字以内）
-- 本文: リード文 → ## {source}が報じたこと → ## [結論H2見出し] → ## 行動の考え方 → ## このニュースで注目すべき銘柄
-- 「## {source}が報じたこと」は「{source}によると、」という書き出しで800〜1000字
-- タイトルで結論・答えを明かさない（好奇心を引くが答えは本文で明かす）
-- 銘柄セクション末尾に誘導文を入れ、最後の行に単独で次のURLを置く（埋め込みカード用）：
-{MAGAZINE_URL}
-- 末尾: TOPIC_TAGS: タグ1,タグ2（為替/FRB/金利/決算/マクロ経済/エネルギー/半導体/日銀/円安/円高 から2つ）
-- 「おわりに」「今週の注目指標」見出し禁止・絵文字禁止
-- コメント・まとめ・前置き不要。記事本文のみ出力"""
-            supplement = run_claude(supplement_prompt, model="claude-opus-4-6", timeout=600)
-            if supplement:
-                s_title_match = re.search(r'^TITLE:\s*(.+)$', supplement, re.MULTILINE)
-                if s_title_match and not title:
-                    title = s_title_match.group(1).strip()
-                    supplement = re.sub(r'^TITLE:\s*.+\n?', '', supplement, count=1, flags=re.MULTILINE).strip()
-                s_tags_match = re.search(r'TOPIC_TAGS:\s*(.+)$', supplement, re.MULTILINE)
-                if s_tags_match and not topic_tags:
-                    s_raw = [t.strip() for t in s_tags_match.group(1).split(',')]
-                    topic_tags = [t for t in s_raw if t in TOPIC_TAGS_OPTIONS][:2]
-                    supplement = re.sub(r'TOPIC_TAGS:\s*.+$', '', supplement, flags=re.MULTILINE).strip()
-
-        if supplement:
-            expanded = clean_article(supplement)
-            # 補強後が元より長い場合のみ採用
-            if len(expanded) > len(draft):
-                draft = expanded
-            print(f"  補強後: {len(draft)} 文字")
 
     draft = clean_article(draft)
 
@@ -524,29 +434,77 @@ def write_article(news: dict, article_num: int) -> dict:
     print(f"  銘柄チャートを生成中...")
     draft, image_paths = inject_stock_charts(draft)
 
-    # タイトルが抽出できなかった場合は本文H2から取得
-    if not title:
-        first_h2 = re.search(r'^##\s+(.+)$', draft, re.MULTILINE)
-        if first_h2:
-            title = first_h2.group(1).strip()
-        else:
-            title = news['title'][:30]
-
-    all_tags = FIXED_TAGS + [t for t in topic_tags if t not in FIXED_TAGS]
+    # ニュースソース引用画像がある場合は先頭に挿入
+    news_img_path = download_news_image(news.get("image_url", ""), section_num)
+    if news_img_path:
+        # 既存の __IMAGE_n__ インデックスを1つずつ繰り上げ
+        draft = re.sub(r'__IMAGE_(\d+)__', lambda m: f'__IMAGE_{int(m.group(1)) + 1}__', draft)
+        image_paths = [news_img_path] + image_paths
+        # 最初のH1見出し行の直後に __IMAGE_0__ を挿入
+        draft = re.sub(r'(^# .+$)', r'\1\n\n__IMAGE_0__', draft, count=1, flags=re.MULTILINE)
+        print(f"  ニュース引用画像を先頭に挿入（計{len(image_paths)}枚）")
 
     return {
-        "title": title,
-        "article": draft,
-        "tags": all_tags,
-        "topic_tags": topic_tags,
-        "source_news": news,
+        "text": draft,
         "image_paths": image_paths,
-        "cover_path": None,
+        "topic_tags": topic_tags,
     }
 
 
+def generate_summary(sec1_text: str, sec2_text: str) -> str:
+    """2セクションから10秒サマリー（①②番号付き2行）を生成する"""
+    prompt = f"""以下の2つの投資ニュースセクションを読んで、読者が「続きを読みたい」と思うサマリーを2行で書いてください。
+
+要件：
+- 1行目は「① 」で始める、2行目は「② 」で始める
+- 各行は60字以内
+- 単なる事実の要約ではなく「疑問・緊張感・注目点」で読者を引き込む形にする
+  例：「① ドル円が160円台まで円安進行、約1年8カ月ぶり」→ NG（事実の列挙）
+  例：「① ドル円が160円台まで円安進行、政府の為替介入はいつくるのか？」→ OK（続きが読みたくなる）
+- 「この動きで○○はどうなる？」「○○の決断が注目される」「本当の勝者は誰か」など疑問・興味を引く表現を使う
+- 専門用語なし
+- 「* 」は絶対に使わない
+- 2行のみ出力（説明・前置き不要）
+
+【セクション1（抜粋）】
+{sec1_text[:600]}
+
+【セクション2（抜粋）】
+{sec2_text[:600]}"""
+
+    result = run_claude(prompt, model="claude-sonnet-4-6", timeout=120)
+    if result:
+        lines = [l.strip() for l in result.strip().split('\n')
+                 if l.strip().startswith('①') or l.strip().startswith('②')]
+        if len(lines) >= 2:
+            return '\n'.join(lines[:2])
+
+    # フォールバック：各セクションの最初の文を使う
+    def first_sentence(text: str) -> str:
+        clean = re.sub(r'^#{1,3}\s+.+$', '', text, flags=re.MULTILINE).strip()
+        m = re.search(r'[。！？]', clean[:200])
+        return clean[:m.end()] if m else clean[:80]
+
+    return f"① {first_sentence(sec1_text)}\n② {first_sentence(sec2_text)}"
+
+
+def get_random_cover_image() -> str | None:
+    """~/Desktop/投資画像/ からランダムに画像を返す"""
+    import glob
+    import random
+    folder = os.path.expanduser("~/Desktop/投資画像")
+    if not os.path.isdir(folder):
+        return None
+    images = (
+        glob.glob(os.path.join(folder, "*.png")) +
+        glob.glob(os.path.join(folder, "*.jpg")) +
+        glob.glob(os.path.join(folder, "*.jpeg"))
+    )
+    return random.choice(images) if images else None
+
+
 def main():
-    print("=== ② 記事執筆（2本） ===")
+    print("=== ② 記事執筆（1本・2ニュース構成） ===")
 
     with open("output/collected_news.json", encoding="utf-8") as f:
         articles = json.load(f)
@@ -554,34 +512,78 @@ def main():
     # 2トピック選定
     print("  トピック選定中...")
     news1, news2 = select_topics(articles)
-    print(f"  記事1トピック: {news1['title']}")
-    print(f"  記事2トピック: {news2['title']}")
+    print(f"  セクション1トピック: {news1['title']}")
+    print(f"  セクション2トピック: {news2['title']}")
 
     os.makedirs("output", exist_ok=True)
 
-    # 記事1執筆
-    print(f"\n  --- 記事1執筆 ---")
-    article1 = write_article(news1, 1)
+    # セクション1執筆
+    print(f"\n  --- セクション1執筆 ---")
+    sec1 = write_news_section(news1, 1)
+
+    # セクション2執筆
+    print(f"\n  --- セクション2執筆 ---")
+    sec2 = write_news_section(news2, 2)
+
+    # 30秒サマリー生成
+    print(f"  30秒サマリー生成中...")
+    summary = generate_summary(sec1["text"], sec2["text"])
+
+    # セクション2の画像インデックスをセクション1の枚数分ずらす
+    offset = len(sec1["image_paths"])
+    sec2_text = re.sub(
+        r'__IMAGE_(\d+)__',
+        lambda m: f'__IMAGE_{int(m.group(1)) + offset}__',
+        sec2["text"]
+    )
+
+    # 記事タイトル（固定形式・日付入り）
+    today = datetime.datetime.now(JST)
+    title = f"新聞より早くてわかりやすい今日の投資ニュース速報｜{today.month}/{today.day}"
+
+    # カバー画像（~/Desktop/投資画像/ からランダム）
+    cover_path = get_random_cover_image()
+
+    # 記事本文を組み立て
+    magazine_text = (
+        "情報を正確に理解することは、投資の第一歩に過ぎない。"
+        "株価は常に「情報の一歩先」を織り込んで動いており、"
+        "ニュースを読むだけでは勝てないのが相場の現実だ。"
+        "毎週の注目銘柄・具体的な売買シナリオ・エントリー根拠まで踏み込んで解説する有料マガジンはこちら。"
+        "「知っている」を「稼げる」に変えたい方はぜひ。"
+    )
+    body = (
+        f"## 今日のニュース速報｜10秒サマリー\n\n"
+        f"{summary}\n\n"
+        f"{sec1['text']}\n\n"
+        f"{sec2_text}\n\n"
+        f"{magazine_text}\n\n"
+        f"{MAGAZINE_URL}"
+    )
+
+    # タグ（両セクションのTOPIC_TAGSを合算、重複排除）
+    all_topic_tags = list(dict.fromkeys(sec1["topic_tags"] + sec2["topic_tags"]))[:2]
+    all_tags = FIXED_TAGS + [t for t in all_topic_tags if t not in FIXED_TAGS]
+
+    article = {
+        "title": title,
+        "article": body,
+        "tags": all_tags,
+        "topic_tags": all_topic_tags,
+        "source_news": {"news1": news1, "news2": news2},
+        "image_paths": sec1["image_paths"] + sec2["image_paths"],
+        "cover_path": cover_path,
+    }
+
     with open("output/article_1.json", "w", encoding="utf-8") as f:
-        json.dump(article1, f, ensure_ascii=False, indent=2)
-    print(f"  保存: output/article_1.json  タイトル: {article1['title']}")
+        json.dump(article, f, ensure_ascii=False, indent=2)
+    print(f"  保存: output/article_1.json  タイトル: {title}")
 
-    # 記事2執筆
-    print(f"\n  --- 記事2執筆 ---")
-    article2 = write_article(news2, 2)
-    with open("output/article_2.json", "w", encoding="utf-8") as f:
-        json.dump(article2, f, ensure_ascii=False, indent=2)
-    print(f"  保存: output/article_2.json  タイトル: {article2['title']}")
-
-    # 後方互換: draft.json / final.json
-    with open("output/draft.json", "w", encoding="utf-8") as f:
-        json.dump({"draft": article1["article"], "articles": [news1]}, f, ensure_ascii=False, indent=2)
-    with open("output/polished.json", "w", encoding="utf-8") as f:
-        json.dump({"polished": article1["article"]}, f, ensure_ascii=False, indent=2)
+    # 後方互換
     with open("output/final.json", "w", encoding="utf-8") as f:
-        json.dump(article1, f, ensure_ascii=False, indent=2)
+        json.dump(article, f, ensure_ascii=False, indent=2)
 
-    return {"article_1": article1, "article_2": article2}
+    return {"article_1": article}
 
 
 if __name__ == "__main__":
