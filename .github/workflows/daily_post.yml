@@ -6,6 +6,9 @@ on:
     - cron: "0 20 * * *"
   workflow_dispatch:  # 手動実行も可能
 
+permissions:
+  contents: write
+
 jobs:
   post:
     runs-on: ubuntu-latest
@@ -21,6 +24,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Node.js セットアップ（Claude CLI 用）
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Claude CLI インストール
+        run: npm install -g @anthropic-ai/claude-code
 
       - name: Chrome インストール
         uses: browser-actions/setup-chrome@v1
@@ -41,11 +52,12 @@ jobs:
 
       - name: パイプライン実行
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          NOTE_EMAIL:     ${{ secrets.NOTE_EMAIL }}
-          NOTE_PASSWORD:  ${{ secrets.NOTE_PASSWORD }}
-          HEADLESS:       "false"
-          DISPLAY:        ":99"
+          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTE_EMAIL:        ${{ secrets.NOTE_EMAIL }}
+          NOTE_PASSWORD:     ${{ secrets.NOTE_PASSWORD }}
+          HEADLESS:          "false"
+          DISPLAY:           ":99"
         run: |
           Xvfb :99 -screen 0 1280x900x24 &
           sleep 2
