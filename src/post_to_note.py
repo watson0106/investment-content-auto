@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import re
 import subprocess
 import time
@@ -52,7 +53,38 @@ def build_driver(headless: bool = True):
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1280,900")
-        return uc.Chrome(options=options, headless=headless)
+        # Chrome バージョンを自動検出
+        _major = None
+        try:
+            _system = platform.system()
+            if _system == "Windows":
+                for _base in [r"C:\Program Files\Google\Chrome\Application",
+                              r"C:\Program Files (x86)\Google\Chrome\Application",
+                              os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application")]:
+                    if os.path.isdir(_base):
+                        for _d in os.listdir(_base):
+                            _m = re.match(r"(\d+)\.", _d)
+                            if _m:
+                                _major = int(_m.group(1))
+                                break
+                    if _major:
+                        break
+            elif _system == "Darwin":
+                import subprocess as _sp
+                _ver = _sp.check_output(
+                    ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "--version"],
+                    text=True
+                )
+                _major = int(re.search(r"(\d+)", _ver).group(1))
+            else:
+                import subprocess as _sp
+                _ver = _sp.check_output(["google-chrome", "--version"], text=True)
+                _major = int(re.search(r"(\d+)", _ver).group(1))
+            if _major:
+                print(f"  Chrome version detected: {_major}")
+        except Exception as _e:
+            print(f"  [WARN] Chrome version detection failed: {_e}")
+        return uc.Chrome(options=options, headless=headless, version_main=_major)
 
 
 def login(driver, wait: WebDriverWait):
@@ -153,46 +185,125 @@ def paste_image_from_clipboard(driver, editor_el, image_path: str) -> bool:
 
 
 def _paste_image_via_js(driver, editor_el, abs_path: str) -> bool:
-    """JavaScript DataTransfer drop イベントで画像を挿入する"""
+    """
+    JSで note の画像アップロードAPIを叩いて画像を挿入する。
+    - エンドポイント候補を順次試行（/api/v1/image_upload → /api/v2/attachments → /api/v1/images）
+    - CSRFトークンを meta タグから取得してヘッダに付与
+    - フィールド名候補（image / file / attachment）も順次試行
+    """
     try:
         import base64
         with open(abs_path, "rb") as f:
             b64 = base64.b64encode(f.read()).decode()
         ext = os.path.splitext(abs_path)[1].lower().replace(".", "") or "png"
         mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(ext, "image/png")
+        fname = os.path.basename(abs_path)
 
         result = driver.execute_async_script(f"""
             var done = arguments[arguments.length - 1];
             var b64 = "{b64}";
             var mime = "{mime}";
+            var fname = "{fname}";
             var byteChars = atob(b64);
             var byteArr = new Uint8Array(byteChars.length);
             for (var i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
             var blob = new Blob([byteArr], {{type: mime}});
-            var fd = new FormData();
-            fd.append("image", blob, "chart.{ext}");
-            fetch("/api/v1/images", {{
-                method: "POST",
-                credentials: "include",
-                headers: {{"x-requested-with": "XMLHttpRequest"}},
-                body: fd
-            }})
-            .then(function(r) {{ return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }}); }})
-            .catch(function(e) {{ done({{error: e.toString()}}); }});
+
+            // CSRFトークンを取得
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            var csrf = csrfMeta ? csrfMeta.getAttribute('content') : null;
+            // cookie からも探す
+            if (!csrf) {{
+                var m = document.cookie.match(/(?:^|;\\s*)XSRF-TOKEN=([^;]+)/);
+                if (m) csrf = decodeURIComponent(m[1]);
+            }}
+
+            var endpoints = [
+                '/api/v1/image_upload',
+                '/api/v2/attachments',
+                '/api/v1/attachments',
+                '/api/v1/images',
+                '/api/v3/images',
+            ];
+            var fields = ['image', 'file', 'attachment'];
+
+            async function tryOne(url, field) {{
+                var fd = new FormData();
+                fd.append(field, blob, fname);
+                var headers = {{'x-requested-with': 'XMLHttpRequest'}};
+                if (csrf) {{
+                    headers['x-csrf-token'] = csrf;
+                    headers['X-XSRF-TOKEN'] = csrf;
+                }}
+                try {{
+                    var r = await fetch(url, {{
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: headers,
+                        body: fd
+                    }});
+                    var t = await r.text();
+                    return {{url: url, field: field, status: r.status, text: t}};
+                }} catch (e) {{
+                    return {{url: url, field: field, error: e.toString()}};
+                }}
+            }}
+
+            (async function() {{
+                var attempts = [];
+                for (var i = 0; i < endpoints.length; i++) {{
+                    for (var j = 0; j < fields.length; j++) {{
+                        var res = await tryOne(endpoints[i], fields[j]);
+                        attempts.push(res);
+                        if (res.status && (res.status === 200 || res.status === 201)) {{
+                            done({{success: res, attempts: attempts, csrf_found: !!csrf}});
+                            return;
+                        }}
+                    }}
+                }}
+                done({{success: null, attempts: attempts, csrf_found: !!csrf}});
+            }})();
         """)
-        if result and result.get("status") in (200, 201):
+
+        if result and result.get("success"):
+            success = result["success"]
+            print(f"    upload OK via {success['url']} (field={success['field']})")
             import json as _json
-            data = _json.loads(result["text"])
-            img_url = data.get("data", {}).get("url") or data.get("url")
+            try:
+                data = _json.loads(success["text"])
+            except Exception:
+                data = {}
+            # レスポンスから画像URLを抽出（様々な形式に対応）
+            img_url = (
+                (data.get("data") or {}).get("url")
+                or (data.get("data") or {}).get("image_url")
+                or data.get("url")
+                or data.get("image_url")
+                or data.get("src")
+            )
             if img_url:
                 driver.execute_script(
                     "document.execCommand('insertHTML', false, arguments[0])",
                     f'<img src="{img_url}"><br>'
                 )
-                time.sleep(2)
-                print(f"    JS upload 成功: {img_url[:60]}")
+                time.sleep(1.5)
+                print(f"    挿入成功: {img_url[:70]}")
                 return True
-        print(f"  [WARN] JS upload: status={result.get('status') if result else 'None'} {result.get('text','')[:80]}")
+            else:
+                print(f"    [WARN] URLが抽出できない: {success['text'][:200]}")
+                return False
+
+        # 全部失敗 → 最初の試行の結果を表示してデバッグ
+        attempts = (result or {}).get("attempts", [])
+        csrf_ok = (result or {}).get("csrf_found", False)
+        print(f"  [WARN] 画像アップロード全滅 (csrf={'取得済' if csrf_ok else '未取得'}, 試行{len(attempts)}件)")
+        seen_statuses = set()
+        for a in attempts[:6]:
+            status = a.get("status") or a.get("error", "")[:30]
+            key = f"{a['url']}:{status}"
+            if key not in seen_statuses:
+                seen_statuses.add(key)
+                print(f"    - {a['url']}[{a['field']}]: {status}")
         return False
     except Exception as e:
         print(f"  [WARN] JS 画像挿入失敗: {e}")
@@ -726,44 +837,100 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
         time.sleep(2)
 
         if price > 0:
-            # 有料公開: note API で price を設定して公開
-            print(f"  有料記事として公開中（¥{price}）...")
-            driver.set_script_timeout(20)
-            pub_result = driver.execute_async_script(f"""
-                var done = arguments[arguments.length - 1];
-                fetch('/api/v1/text_notes/{note_key}', {{
-                    method: 'PUT',
-                    credentials: 'include',
-                    headers: {{
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'x-requested-with': 'XMLHttpRequest'
-                    }},
-                    body: JSON.stringify({{
-                        status: 'public',
-                        price: {price},
-                        hashtag_list: {json.dumps(tags)}
-                    }})
-                }})
-                .then(function(r) {{
-                    return r.text().then(function(t) {{ done({{status: r.status, text: t}}); }});
-                }})
-                .catch(function(e) {{ done({{error: e.toString()}}); }});
-            """)
-            if pub_result and pub_result.get("status") in (200, 201):
-                print(f"  有料公開成功 (¥{price})")
-            else:
-                print(f"  [WARN] 有料公開API失敗 (status={pub_result.get('status') if pub_result else 'None'})。下書き保存にフォールバック")
+            # ── 有料記事の公開フロー ──
+            print(f"  有料記事として公開中（{price}円）...")
+
+            # Step 1: 「公開に進む」ボタンで公開設定ページへ
+            print("  「公開に進む」をクリック...")
+            go_publish_btn = wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[contains(., '公開に進む')]")
+            ))
+            driver.execute_script("arguments[0].click();", go_publish_btn)
+            time.sleep(5)
+
+            # Step 2: ハッシュタグを追加
+            print("  ハッシュタグ追加中...")
+            try:
+                tag_input = wait.until(EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "input[placeholder='ハッシュタグを追加する']")
+                ))
+                for tag in tags:
+                    tag_input.clear()
+                    tag_input.send_keys(tag)
+                    time.sleep(0.3)
+                    tag_input.send_keys(Keys.RETURN)
+                    time.sleep(0.3)
+                print(f"  タグ {len(tags)} 個追加完了")
+            except Exception as e:
+                print(f"  [WARN] タグ追加失敗: {e}")
+
+            # Step 3: 「有料」を選択
+            print("  有料設定中...")
+            paid_label = wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//label[.//span[text()='有料']]")
+            ))
+            driver.execute_script("arguments[0].click();", paid_label)
+            time.sleep(2)
+
+            # Step 4: 価格を入力
+            try:
+                price_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='300']")
+                price_input.clear()
+                price_input.send_keys(str(price))
+                time.sleep(1)
+                print(f"  価格 {price}円 を設定")
+            except Exception as e:
+                print(f"  [WARN] 価格入力失敗（デフォルト100円で続行）: {e}")
+
+            # Step 5: 「有料エリア設定」ボタンでエディタに戻る
+            print("  有料エリア設定中...")
+            try:
+                area_btn = wait.until(EC.element_to_be_clickable(
+                    (By.XPATH, "//span[contains(text(), '有料エリア設定')]/ancestor::button")
+                ))
+                driver.execute_script("arguments[0].click();", area_btn)
+                time.sleep(3)
+            except Exception as e:
+                print(f"  [WARN] 有料エリア設定ボタンが見つからない: {e}")
+
+            # Step 6: paywall-line をクリックして有料エリアを確定
+            try:
+                paywall_btn = wait.until(EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(., 'このラインより先を有料にする')]")
+                ))
+                driver.execute_script("arguments[0].click();", paywall_btn)
+                time.sleep(2)
+                print("  有料エリア境界を設定")
+            except Exception:
                 try:
-                    draft_btn = wait.until(EC.element_to_be_clickable(
-                        (By.XPATH, "//button[contains(., '下書き保存')]")
-                    ))
-                    driver.execute_script("arguments[0].click();", draft_btn)
-                    time.sleep(3)
+                    change_btns = driver.find_elements(By.XPATH,
+                        "//button[contains(., 'ラインをこの場所に変更')]")
+                    if change_btns:
+                        driver.execute_script("arguments[0].click();", change_btns[0])
+                        time.sleep(2)
+                        print("  有料エリア境界を変更")
                 except Exception:
-                    time.sleep(5)
+                    print("  [WARN] 有料エリア境界の設定をスキップ")
+
+            # Step 7: 「投稿する」ボタンで公開
+            print("  記事を投稿中...")
+            submit_btn = wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[contains(., '投稿する')]")
+            ))
+            driver.execute_script("arguments[0].click();", submit_btn)
+            time.sleep(5)
+
+            # 投稿完了後のURLを確認
+            current_url = driver.current_url
+            if "/n/" in current_url and "edit" not in current_url and "publish" not in current_url:
+                url = current_url
+            else:
+                url = f"https://note.com/kawasewatson0106/n/{note_key}"
+
+            print(f"  有料記事公開完了: {url}")
+            return url
         else:
-            # 無料記事: 下書き保存
+            # ── 無料記事: 下書き保存 ──
             print("  下書き保存中...")
             try:
                 draft_btn = wait.until(EC.element_to_be_clickable(
@@ -779,7 +946,7 @@ def post_article(title: str, body: str, image_paths: list[str], tags: list[str],
                 time.sleep(5)
 
         url = f"https://note.com/kawasewatson0106/n/{note_key}"
-        print(f"  {'公開' if price > 0 else '下書き保存'}完了: {url}")
+        print(f"  下書き保存完了: {url}")
         return url
 
     finally:

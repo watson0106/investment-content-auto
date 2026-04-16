@@ -6,16 +6,63 @@
 ## プロジェクト概要
 - 毎日投資ニュースを自動収集・AI分析・記事生成・note投稿するパイプライン
 - GitHub Actions で毎朝 JST 07:00 に自動実行
+- LINE Bot経由でiPhoneからClaude Codeに質問・指示を送れる
 
 ## ユーザー指示
 - おおまかな計画だけ言う、細かい判断・選択はすべてClaudeに一任
 - 承認を求めずに最善策を実行して成果物を作り上げること
 - 会話の進捗・決定事項を CLAUDE.md に逐一保存すること
 
+## 環境セットアップ
+
+### 共通（Windows / Mac）
+```bash
+git clone https://github.com/watson0106/investment-content-auto.git
+cd investment-content-auto
+pip install -r requirements.txt
+cp .env.example .env   # .envを編集して各種トークンを設定
+npm install -g @anthropic-ai/claude-code
+```
+
+### .env に必要な値
+```
+NOTE_EMAIL=（note.comログイン用メール）
+NOTE_PASSWORD=（note.comパスワード）
+LINE_CHANNEL_ACCESS_TOKEN=（LINE Messaging API トークン）
+LINE_USER_ID=（自分のLINEユーザーID）
+KABU_API_PASSWORD_PROD=（kabuステーションAPI本番パスワード）
+KABU_API_PASSWORD_TEST=（kabuステーションAPI検証パスワード）
+KABU_API_ENV=prod
+KABU_API_HOST=localhost
+```
+
+### Mac固有のセットアップ
+```bash
+# cloudflared（LINE Bot用トンネル）
+brew install cloudflare/cloudflare/cloudflared
+
+# Chrome（Selenium用）
+brew install --cask google-chrome
+
+# LINE Bot起動
+python src/line_bot.py
+# → cloudflaredが自動起動し、Webhook URLがログに表示される
+# → LINE DevelopersでWebhook URLを更新する
+```
+
+### Windows固有のセットアップ
+```bash
+# cloudflared
+winget install Cloudflare.cloudflared
+
+# LINE Bot起動
+python src/line_bot.py
+```
+
 ## 進捗状況
 
-### 現在の構成 ✅
-- **全工程 Claude CLI のみ**（GeminiもAnthropicAPIキーも不使用）
+### 現在の構成
+- 全工程 Claude CLI のみ（GeminiもAnthropicAPIキーも不使用）
 - Claude CLIはOAuth認証（claude.ai Proアカウント）で動作
 - GitHub ActionsではCLAUDE_CODE_CREDENTIALSシークレットからOAuthトークンを読み込む
 
@@ -25,14 +72,21 @@
 - [x] src/post_to_note.py（JS API方式でnote下書き保存）
 - [x] src/main.py（パイプライン統合エントリポイント）
 - [x] .github/workflows/daily_post.yml（毎日 JST 05:00 = UTC 20:00）
+- [x] src/line_bot.py（LINE Bot ↔ Claude Code連携サーバー）
+
+### LINE Bot構成
+- LINE Messaging API + cloudflared quick tunnel
+- Webhookでメッセージ受信 → Claude CLI `-p` で応答生成 → Push APIで返信
+- LINE_USER_IDフィルターで自分のメッセージのみ処理
+- cloudflaredのURLは起動のたびに変わるため、LINE DevelopersのWebhook URLを都度更新する
+- LINE Developersチャネル: morning-edgeと共用（Bot ID: @144dwdsw）
 
 ### GitHub Secrets（登録済み）
-- CLAUDE_CODE_CREDENTIALS：OAuthトークンJSON（キーチェーンから取得）
-- NOTE_EMAIL = watson19910704@gmail.com
-- NOTE_PASSWORD = ts2164
-- GEMINI_API_KEY：カバー画像生成用（ワークフローのenv:に追加済み。**GitHub Secretsで管理。CLAUDE.mdには書かない**）
+- CLAUDE_CODE_CREDENTIALS：OAuthトークンJSON
+- NOTE_EMAIL / NOTE_PASSWORD
+- GEMINI_API_KEY：カバー画像生成用（GitHub Secretsで管理。CLAUDE.mdには書かない）
 
-### note投稿方式（JS API方式）✅ 動作確認済み
+### note投稿方式（JS API方式）
 - undetected-chromedriver + headless=false でWAFを回避
 - ログイン: `POST /api/v1/sessions/sign_in`
 - ドラフト作成・公開: `PUT /api/v1/text_notes/{id}`
@@ -114,19 +168,14 @@ __MAGAZINE_EMBED__               ← 有料マガジン埋め込み自動挿入
 ## 画像仕様
 
 ### カバー画像（サムネイル）
-- **Geminiは一切使用しない**
-- **優先①**: `~/Desktop/投資画像/` 内の最新画像を使用（Gemini_Gener...で始まるファイルを優先）
-- **優先②**: `assets/cover_image.png` をフォールバック（デスクトップ画像なし時）
-- `post_to_note.py` の `_upload_cover_image()` で3段階アプローチを実行:
-  1. エディタ上部のアイキャッチエリアをクリック → ファイルインプット出現 → send_keys
-  2. 「公開に進む」モーダルのアイキャッチエリア経由
-  3. note API `POST /api/v1/text_notes/{key}/eyecatch` でbase64アップロード
-- アップロード後6秒待機
+- Geminiは一切使用しない
+- 優先1: `~/Desktop/投資画像/` 内の最新画像を使用
+- 優先2: `assets/cover_image.png` をフォールバック
+- `post_to_note.py` の `_upload_cover_image()` で3段階アプローチ
 
 ### 銘柄チャート
 - `generate_images.py` が yfinance + matplotlib で1時間足チャート生成
 - 銘柄コード抽出: `# このニュースで注目すべき銘柄` セクション直後の行から `（TICKER）` を抽出
-  - 「銘柄名：」プレフィックスありなし両対応
 - 日本株4桁→ `.T` 付加（例：7203 → 7203.T）
 - MA5/MA20/RSI(14)/出来高付きダークテーマチャート
 - `__CHART_0__` → `__IMAGE_0__`、`__CHART_1__` → `__IMAGE_1__` に置換して挿入
@@ -148,6 +197,6 @@ __MAGAZINE_EMBED__               ← 有料マガジン埋め込み自動挿入
 ## 絶対ルール
 - Anthropic API キーは使わない（OAuthトークンのみ）
 - Claude CLI の OAuth 認証のみ
-- **Gemini は一切使わない**（APIキーがあっても使用禁止）
-- **YouTube note パイプラインは無効化済み**（英語タイトル記事を作成するため）
+- Gemini は一切使わない（APIキーがあっても使用禁止）
+- YouTube note パイプラインは無効化済み（英語タイトル記事を作成するため）
 - 会話の進捗・決定事項をこのファイルに逐一保存する

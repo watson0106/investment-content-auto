@@ -1,82 +1,72 @@
 [
   {
-    "source": "CNBC Top News",
-    "title": "The Fed issues its latest interest rate decision Wednesday. Here's what to expect",
-    "summary": "The Federal Reserve has little choice but to stay on the sidelines this week.",
-    "url": "https://www.cnbc.com/2026/03/17/the-fed-issues-its-latest-interest-rate-decision-wednesday-heres-what-to-expect.html",
-    "published": "2026-03-18T05:29:55+09:00",
-    "score": 4.5
+    "source": "Bloomberg Markets",
+    "title": "Bitcoin Faces $14 Billion Options Expiry While Middle East Turmoil Mounts",
+    "summary": "Bitcoin’s largest options expiry of the year is colliding with geopolitical volatility that shows no sign of letting up with make or break peace talks uncertain.",
+    "url": "https://www.bloomberg.com/news/articles/2026-03-26/bitcoin-faces-14-billion-options-expiry-while-middle-east-turmoil-mounts",
+    "published": "2026-03-27T01:55:29+09:00"
   },
   {
-    "source": "CNBC Top News",
-    "title": "Airlines raise revenue guidance despite rising fuel costs, citing growth in demand",
-    "summary": "CEO Ed Bastian told CNBC's Phil LeBeau that Delta had taken a $400 million fuel hit in the quarter, but that demand has been \"really, really great.\"",
-    "url": "https://www.cnbc.com/2026/03/17/airline-guidance-iran-war-oil.html",
-    "published": "2026-03-18T05:00:39+09:00",
-    "score": 4.5
+    "source": "Bloomberg Technology",
+    "title": "The Startup Selling Full-Body Scans as the Future of Health Care",
+    "summary": "Step into the machine at Neko Health or one of its rivals to check for skin cancer, diabetes or stroke risk. Is this the next frontier in preventative health care, or something your primary care physician would rather you avoid?",
+    "url": "https://www.bloomberg.com/news/articles/2026-03-27/spotify-co-founder-is-behind-body-scan-startup-competing-with-prenuvo",
+    "published": "2026-03-27T19:00:11+09:00"
+  },
+  {
+    "source": "Nikkei Asia",
+    "title": "Air China logs sixth straight loss as rail competition bites and risks rise",
+    "summary": "",
+    "url": "https://asia.nikkei.com/business/transportation/air-china-logs-sixth-straight-loss-as-rail-competition-bites-and-risks-rise",
+    "published": ""
+  },
+  {
+    "source": "Yahoo Finance",
+    "title": "Analyst Report: CMS Energy Corp",
+    "summary": "",
+    "url": "https://finance.yahoo.com/research/reports/ARGUS_2849_AnalystReport_1774544291000?yptr=yahoo&ncid=yahooproperties_plusresear_nm5q6ze1cei",
+    "published": "2026-03-27T01:58:11+09:00"
+  },
+  {
+    "source": "Yahoo Finance Japan",
+    "title": "4月の電気ガス 大手全て値上がり",
+    "summary": "",
+    "url": "https://news.yahoo.co.jp/pickup/6574392?source=rss",
+    "published": "2026-03-27T17:57:47+09:00"
+  },
+  {
+    "source": "Yahoo Japan トップ",
+    "title": "外食 特定技能1号受け入れ停止へ",
+    "summary": "",
+    "url": "https://news.yahoo.co.jp/pickup/6574397?source=rss",
+    "published": "2026-03-27T18:44:57+09:00"
+  },
+  {
+    "source": "CNBC",
+    "title": "Oil prices rise as Trump says Iran let 10 tankers through Strait of Hormuz as a 'present'",
+    "summary": "Oil prices traded higher after U.S. President Donald Trump said Iran had allowed 10 oil tankers to pass through the Strait of Hormuz.",
+    "url": "https://www.cnbc.com/2026/03/27/oil-price-wti-brent-crude-trump-strait-hormuz-tensions-iran-ships.html",
+    "published": "2026-03-27T18:13:41+09:00"
   },
   {
     "source": "MarketWatch",
-    "title": "Lilly gets rare downgrade as analysts question hype over GLP-1 pills and Zepbound’s cash sales",
-    "summary": "If middle-class Americans lose their jobs to AI, that could mean fewer cash sales of weight-loss drugs like Zepbound.",
-    "url": "https://www.marketwatch.com/story/lilly-gets-rare-downgrade-as-analysts-question-hype-over-glp-1-pills-and-zepbounds-cash-sales-60b231f4?mod=mw_rss_topstories",
-    "published": "2026-03-18T03:28:00+09:00",
-    "score": 4.0
+    "title": "Why investors should put 10% of their money in gold, says this strategist",
+    "summary": "Most of the motivations for gold that have driven the price up so forcefully in the past year are still applicable, according to strategist Tom Bruce.",
+    "url": "https://www.marketwatch.com/story/why-investors-should-put-10-of-their-money-in-gold-says-this-strategist-3caeb8ca?mod=mw_rss_topstories",
+    "published": "2026-03-27T18:59:00+09:00"
   },
   {
-    "source": "CNBC Top News",
-    "title": "Lululemon reports weak guidance as proxy battle, tariffs weigh on bottom line",
-    "summary": "Lululemon topped fourth-quarter estimates but gave weaker-than-expected sales and earnings forecasts for 2026.",
-    "url": "https://www.cnbc.com/2026/03/17/lululemon-lulu-earnings-q4-2025.html",
-    "published": "2026-03-18T05:48:12+09:00",
-    "score": 4.0
+    "source": "NHK 経済",
+    "title": "米政府の「アンソロピック」への措置 一時差し止め 連邦地裁",
+    "summary": "アメリカのトランプ政権が、生成AIを開発する新興企業「アンソロピック」を国家安全保障上のサプライチェーンのリスクに指定した措置などについて、西部カリフォルニア州の連邦地方裁判所は、一時的な差し止めを命…",
+    "url": "https://news.web.nhk/newsweb/na/na-k10015085771000",
+    "published": "2026-03-27T18:11:13+09:00"
   },
   {
-    "source": "Bloomberg Markets",
-    "title": "AI Drone Software Stock Jumps 700% in Best IPO Since Newsmax",
-    "summary": "Swarmer Inc. shares skyrocketed 700% on Tuesday, putting the artificial intelligence drone software maker on pace for the best trading debut by a US stock since Newsmax Inc.’s blockbuster entry nearly a year ago.",
-    "url": "https://www.bloomberg.com/news/articles/2026-03-17/ai-drone-software-stock-jumps-700-in-best-ipo-since-newsmax",
-    "published": "2026-03-18T04:20:02+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "Exxon Mobil: Avoid Being The Latecomer To The Energy Party (Downgrade)",
+    "source": "ロイター",
+    "title": "アイリスオーヤマ、ライフドリンクＣ株を大量保有　純投資目的",
     "summary": "",
-    "url": "https://seekingalpha.com/article/4883329-exxon-mobil-avoid-being-latecomer-to-energy-party-downgrade?source=feed_all_articles",
-    "published": "2026-03-18T05:45:47+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "EOG Resources: Near-Term Boost From The Iran Conflict, But Fundamental Risks Are Rising (Rating Downgrade)",
-    "summary": "",
-    "url": "https://seekingalpha.com/article/4883315-eog-resources-near-term-boost-from-iran-conflict-fundamental-risks-are-rising?source=feed_all_articles",
-    "published": "2026-03-18T05:06:10+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "Monetary Policy Rules Suggest Fed Should Hold Steady In March",
-    "summary": "",
-    "url": "https://seekingalpha.com/article/4883328-monetary-policy-rules-suggest-fed-should-hold-steady-in-march?source=feed_all_articles",
-    "published": "2026-03-18T05:05:00+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "Seeking Alpha",
-    "title": "Sable Offshore Stock: The Surge Offers A Great Exit Point (Downgrade)",
-    "summary": "",
-    "url": "https://seekingalpha.com/article/4883314-sable-offshore-stock-surge-offers-great-exit-point-downgrade?source=feed_all_articles",
-    "published": "2026-03-18T05:02:57+09:00",
-    "score": 3.0
-  },
-  {
-    "source": "CNBC Top News",
-    "title": "U.S. says it may be forced to shut down some airports over funding standoff",
-    "summary": "The partial government shutdown has forced 50,000 Transportation Security Administration airport security officers to work without pay for the last month.",
-    "url": "https://www.cnbc.com/2026/03/17/airlines-tsa-dhs-shutdown-travel.html",
-    "published": "2026-03-18T01:05:34+09:00",
-    "score": 3.0
+    "url": "https://jp.reuters.com/markets/global-markets/SVYEPDCEFZM6TPL4OF6P2JJSZY-2026-03-27/",
+    "published": ""
   }
 ]
