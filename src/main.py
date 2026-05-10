@@ -44,6 +44,7 @@ import manage_magazine
 import daily_report
 import anomaly_detector
 import weekly_trade_report
+import generate_x_teaser
 
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
@@ -130,6 +131,16 @@ def run_pipeline():
                 print("  重要ステップ失敗のため終了")
                 sys.exit(1)
             # 非重要ステップは継続
+
+    # ── X(Twitter)用の予告ツイート生成（手動コピペ用） ──────────────
+    print(f"\n{'─'*40}")
+    print("  ⑥-2 X予告ツイート生成")
+    print(f"{'─'*40}")
+    try:
+        generate_x_teaser.main()
+    except Exception:
+        print("  [WARN] X teaser生成エラー（継続）:")
+        traceback.print_exc()
 
     # ── ⑧ PDCAトラッカー（スキ数更新 + 記事登録） ─────────────────
 
