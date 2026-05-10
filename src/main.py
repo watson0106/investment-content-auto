@@ -43,6 +43,7 @@ import update_note_profile
 import manage_magazine
 import daily_report
 import anomaly_detector
+import weekly_trade_report
 
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
@@ -64,7 +65,40 @@ def run_pipeline():
     print(f"  日時: {today.strftime('%Y-%m-%d %H:%M')} JST  曜日: {['月','火','水','木','金','土','日'][today.weekday()]}")
     print("=" * 50)
 
-    # ── 毎日実行ステップ ──────────────────────────────────────────
+    # 月曜は「先週の実トレード結果」記事を投稿（メンバーシップ訴求の主役）
+    # 火-金は通常のニュース解説記事を投稿
+    # 1日1記事原則を守るため、月曜は通常記事をスキップする
+    monday_only_weekly_report = is_weekly_analysis_day()
+
+    posted_note_key = None
+
+    if monday_only_weekly_report:
+        print("\n[月曜] 週次トレード結果記事を投稿します（通常ニュース記事はスキップ）")
+        try:
+            sys.argv_backup = sys.argv
+            sys.argv = ["weekly_trade_report.py", "--post"]
+            try:
+                weekly_trade_report.main()
+            finally:
+                sys.argv = sys.argv_backup
+        except Exception:
+            print("  [WARN] 週次トレード記事エラー（継続）:")
+            traceback.print_exc()
+        # 週次トレード記事のみで終了。以降のPDCA・マガジン管理は実行
+        try:
+            pdca_tracker.main(mode="weekly")
+        except Exception:
+            traceback.print_exc()
+        try:
+            manage_magazine.main()
+        except Exception:
+            traceback.print_exc()
+        print("\n" + "=" * 50)
+        print("✅ パイプライン完了（月曜・週次レポート）")
+        print("=" * 50)
+        return
+
+    # ── 火-金: 通常のニュース解説記事 ──────────────────────────────
 
     steps = [
         ("① ニュース収集",              collect_news.main),
@@ -75,8 +109,6 @@ def run_pipeline():
         ("⑥ note 投稿（無料）",          post_to_note.main),
         # ⑦ YouTube note は無効化（Gemini使用・英語記事のため）
     ]
-
-    posted_note_key = None
 
     for name, func in steps:
         print(f"\n{'─'*40}")
@@ -142,17 +174,7 @@ def run_pipeline():
             print("  [WARN] 有料記事生成エラー（継続）:")
             traceback.print_exc()
 
-    # ── ⑩ 週次PDCA分析（月曜のみ） ──────────────────────────────
-
-    if is_weekly_analysis_day():
-        print(f"\n{'─'*40}")
-        print("  ⑩ 週次PDCA分析（strategy_state.json 更新）")
-        print(f"{'─'*40}")
-        try:
-            pdca_tracker.main(mode="weekly")
-        except Exception:
-            print("  [WARN] 週次PDCA分析エラー（継続）:")
-            traceback.print_exc()
+    # ⑩ 週次PDCA分析・週次トレード記事は冒頭の monday-only ブロックで処理済み
 
     # ── ⑪ マガジン自動管理（高スキ記事を自動追加） ─────────────
 

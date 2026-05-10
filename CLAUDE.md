@@ -70,9 +70,16 @@ python src/line_bot.py
 - [x] src/collect_news.py（RSS 13ソース → Claude CLIで選定）
 - [x] src/deep_research.py（Claude Opus 4.6で記事執筆）
 - [x] src/post_to_note.py（JS API方式でnote下書き保存）
-- [x] src/main.py（パイプライン統合エントリポイント）
-- [x] .github/workflows/daily_post.yml（毎日 JST 05:00 = UTC 20:00）
+- [x] src/main.py（パイプライン統合エントリポイント。月曜は週次トレード記事のみ）
+- [x] src/weekly_trade_report.py（先週の実トレード集計→無料記事化、月曜投稿）
+- [x] .github/workflows/daily_post.yml（**月-金 JST 07:00 = UTC 22:00 前日**、土日スキップ）
 - [x] src/line_bot.py（LINE Bot ↔ Claude Code連携サーバー）
+
+### 投稿スケジュール（2026-05-10改定）
+- 月曜: 週次トレード結果記事（メンバーシップ訴求の主役）
+- 火-金: 通常ニュース解説1本
+- 土日: 投稿なし（投資家の閲覧低下時間帯）
+- 1日1本ルール厳守（過去は1日4本投稿でフィード占領・スキ分散していた）
 
 ### LINE Bot構成
 - LINE Messaging API + cloudflared quick tunnel
@@ -80,6 +87,15 @@ python src/line_bot.py
 - LINE_USER_IDフィルターで自分のメッセージのみ処理
 - cloudflaredのURLは起動のたびに変わるため、LINE DevelopersのWebhook URLを都度更新する
 - LINE Developersチャネル: morning-edgeと共用（Bot ID: @144dwdsw）
+
+### iPhoneから遠隔操作（Claude Code Remote Control）
+- 公式機能。iPhoneのClaudeアプリ or claude.ai/code からPC上のセッションに接続
+- 起動: `echo y | claude remote-control`（初回確認プロンプトに自動応答）
+- 自動有効化したい場合: `claude` 内で `/config` → `Enable Remote Control for all sessions` を true
+- 接続先: claude.ai/code のセッション一覧 or 起動時に表示されるURL
+- 実行はPCローカル（ファイル編集・bash全部このマシンで動く）
+- PCスリープ/プロセス終了でセッション切断、ネット切れは約10分でタイムアウト
+- LINE Botと併用可能。Remote Controlの方が高機能なので新規はこちら推奨
 
 ### GitHub Secrets（登録済み）
 - CLAUDE_CODE_CREDENTIALS：OAuthトークンJSON
@@ -199,4 +215,5 @@ __MAGAZINE_EMBED__               ← 有料マガジン埋め込み自動挿入
 - Claude CLI の OAuth 認証のみ
 - Gemini は一切使わない（APIキーがあっても使用禁止）
 - YouTube note パイプラインは無効化済み（英語タイトル記事を作成するため）
+- **株価データはkabuステーションAPI一択**。J-Quantsは過去検証のみ（日常運用では不要）。yfinanceはチャート画像生成用のみ
 - 会話の進捗・決定事項をこのファイルに逐一保存する

@@ -20,7 +20,10 @@ from selenium.webdriver.support import expected_conditions as EC
 NOTE_EMAIL    = os.environ["NOTE_EMAIL"]
 NOTE_PASSWORD = os.environ["NOTE_PASSWORD"]
 
-NOTE_TAGS = ["投資", "米国株", "日本株", "投資情報", "マーケット", "経済", "株式投資", "AI分析"]
+# note検索流入を狙うハッシュタグ（探索性の高い具体タグを優先）
+# 「投資」「経済」のような巨大タグはトップに埋もれる。「個別株投資」「デイトレ」など
+# 中規模タグの方がフォロー層に届きやすい。
+NOTE_TAGS = ["個別株投資", "日本株", "投資ニュース", "デイトレ", "投資戦略", "メンバーシップ", "兼業投資家"]
 
 _IS_CI = bool(os.environ.get("GITHUB_ACTIONS"))
 
