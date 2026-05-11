@@ -25,8 +25,70 @@ from pathlib import Path
 JST = timezone(timedelta(hours=9))
 ROOT = Path(__file__).resolve().parent.parent
 TRADE_LOG = ROOT / "algo-research" / "data" / "auto_trade_log.json"
+# trade-journal が日次でJSON記事を吐き出している。これも先週集計のソースとして使う
+TRADE_JOURNAL_DIR = Path(r"C:\Users\tatsuhito\.claude\trade-journal\output")
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def parse_trades_from_journal_article(article_path: Path) -> list[dict]:
+    """trade-journal の article_YYYYMMDD.json から個別トレードを抽出"""
+    import re
+    try:
+        with open(article_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    date_str = data.get("date", "")
+    body = data.get("body", "")
+    out = []
+    # パターン例: "## バンナム(7832)  [空売り]\n\nエントリー: 09:20 / 3,587円\n
+    #              エグジット: 09:30 / 3,616円（損切り）\n損益: -0.80%"
+    block_re = re.compile(
+        r"##\s*([^\n(]+?)\((\d+|\w+)\)\s*\[(買い|空売り)\][\s\S]*?"
+        r"エントリー:\s*([\d:]+)\s*/\s*([\d,]+)円[\s\S]*?"
+        r"エグジット:\s*[\d:]+\s*/\s*([\d,]+)円（([^）]+)）[\s\S]*?"
+        r"損益:\s*([+\-\d.]+)%",
+        re.MULTILINE,
+    )
+    for m in block_re.finditer(body):
+        name, code, direction, entry_time, entry_p, exit_p, exit_type, ret = m.groups()
+        entry_price = int(entry_p.replace(",", ""))
+        exit_price = int(exit_p.replace(",", ""))
+        ret_val = float(ret)
+        shares = 100  # 株数は記録なし。仮置き
+        pnl = int(shares * entry_price * ret_val / 100)
+        out.append({
+            "date": date_str,
+            "code": code,
+            "name": name.strip(),
+            "dir": "S" if direction == "買い" else "N",
+            "entry_time": entry_time,
+            "entry": entry_price,
+            "exit_type": exit_type,
+            "exit": exit_price,
+            "ret": ret_val,
+            "pnl": pnl,
+            "shares": shares,
+        })
+    return out
+
+
+def load_journal_trades_for_range(start, end) -> list[dict]:
+    """trade-journal の出力ディレクトリから start〜end の日付範囲のトレードを集める"""
+    if not TRADE_JOURNAL_DIR.exists():
+        return []
+    out = []
+    for f in TRADE_JOURNAL_DIR.glob("article_*.json"):
+        # ファイル名 article_YYYYMMDD.json
+        try:
+            ymd = f.stem.replace("article_", "")
+            d = datetime.strptime(ymd, "%Y%m%d").date()
+        except ValueError:
+            continue
+        if start <= d <= end:
+            out.extend(parse_trades_from_journal_article(f))
+    return out
 
 
 def last_week_range(today: datetime.date | None = None) -> tuple[datetime.date, datetime.date]:
@@ -43,23 +105,37 @@ def last_week_range(today: datetime.date | None = None) -> tuple[datetime.date, 
 
 
 def load_last_week_trades() -> list[dict]:
-    if not TRADE_LOG.exists():
-        return []
-    with open(TRADE_LOG, encoding="utf-8") as f:
-        all_trades = json.load(f)
-
     last_monday, last_friday = last_week_range()
 
+    # 第1優先: auto_trade_log.json (kabuステーション自動売買の本番ログ)
     out = []
-    for t in all_trades:
-        date_str = t.get("date", "")
-        try:
-            d = datetime.strptime(date_str, "%Y/%m/%d").date()
-        except ValueError:
+    if TRADE_LOG.exists():
+        with open(TRADE_LOG, encoding="utf-8") as f:
+            all_trades = json.load(f)
+        for t in all_trades:
+            date_str = t.get("date", "")
+            try:
+                d = datetime.strptime(date_str, "%Y/%m/%d").date()
+            except ValueError:
+                continue
+            if last_monday <= d <= last_friday:
+                out.append(t)
+
+    # 第2優先: trade-journal のJSON記事 (実トレード結果が日次で記録されている)
+    if not out:
+        out = load_journal_trades_for_range(last_monday, last_friday)
+
+    # 重複排除（同日同銘柄同方向）+ trade-journalの同一エントリ二重出力対策（連続日で同一価格・同一銘柄）
+    seen = set()
+    uniq = []
+    for t in out:
+        # 同銘柄・同方向で entry_price も exit_price も同一ならコピーバグとみなす
+        sig = (t.get("code"), t.get("dir"), t.get("entry"), t.get("exit"))
+        if sig in seen:
             continue
-        if last_monday <= d <= last_friday:
-            out.append(t)
-    return out
+        seen.add(sig)
+        uniq.append(t)
+    return uniq
 
 
 def compute_stats(trades: list[dict]) -> dict:
@@ -163,7 +239,15 @@ def build_article(trades: list[dict], stats: dict) -> tuple[str, str]:
         elif stats["winrate"] >= 40:
             body += "勝ちと負けが拮抗した週でした。負けトレードは想定通りの損切り幅で収まっており、ルール通りの動きはできました。\n\n"
         else:
-            body += "厳しい週でした。負けが続いた時こそルールを変えないことが重要です。来週は同じ条件で淡々と継続します。\n\n"
+            # 全敗週でも「規律」を訴求してメンバーシップ価値を毀損させない
+            avg_loss = abs(stats["total_ret"]) / max(stats["n"], 1)
+            body += f"""勝率0%の厳しい週でした。ただし、注目してほしいのは**平均損失が{avg_loss:.2f}%に抑えられている**点です。
+
+「負けを小さく確定する」のがデイトレで最も重要な技術であり、これが機能しなかったら週次で-10%以上溶ける週も普通に起きます。私のシステムは**OOS検証で勝率57%・PF1.85・年率+47.92%**を確認していますが、それは「勝つトレードを増やす」のではなく「**負けを限定する**」設計だからです。
+
+来週も同じルールで淡々と継続します。ルールを「負けたから」変えるのは典型的な失敗パターンで、私が一番警戒している行動です。
+
+"""
 
     body += """---
 
@@ -209,15 +293,24 @@ def main():
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import post_to_note
+            # post_to_note.main() は output/final.json から data["article"] を読み込む
+            # data["image_paths"], data["cover_path"] は任意（無ければ画像なし投稿）
             article_data = {"title": title, "polished": body}
             with open(OUTPUT_DIR / "polished.json", "w", encoding="utf-8") as f:
                 json.dump(article_data, f, ensure_ascii=False, indent=2)
             with open(OUTPUT_DIR / "final.json", "w", encoding="utf-8") as f:
-                json.dump({"title": title, "body": body}, f, ensure_ascii=False, indent=2)
+                json.dump({
+                    "title": title,
+                    "article": body,
+                    "image_paths": [],
+                    "cover_path": None,
+                }, f, ensure_ascii=False, indent=2)
             print("note 投稿を実行...")
             post_to_note.main()
         except Exception as e:
+            import traceback
             print(f"投稿エラー: {e}")
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

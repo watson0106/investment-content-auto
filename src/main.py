@@ -95,7 +95,7 @@ def run_pipeline():
         except Exception:
             traceback.print_exc()
         print("\n" + "=" * 50)
-        print("✅ パイプライン完了（月曜・週次レポート）")
+        print("[OK] パイプライン完了（月曜・週次レポート）")
         print("=" * 50)
         return
 
@@ -225,7 +225,7 @@ def run_pipeline():
     # ── 完了 ─────────────────────────────────────────────────────
 
     print("\n" + "=" * 50)
-    print("✅ パイプライン完了")
+    print("[OK] パイプライン完了")
     print("=" * 50)
 
     try:
