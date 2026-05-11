@@ -324,8 +324,11 @@ def select_top_with_claude(articles: list[dict], top_n: int = 10, history_summar
 
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
     try:
+        # Windows対応: claude フルパス解決
+        import shutil
+        claude_path = shutil.which("claude") or shutil.which("claude.cmd") or "claude"
         result = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6"],
+            [claude_path, "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6"],
             capture_output=True, text=True, timeout=60, env=env,
         )
         if result.returncode == 0:

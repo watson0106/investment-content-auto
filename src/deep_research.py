@@ -172,15 +172,43 @@ __MAGAZINE_EMBED__
 - H2のサブ見出しはそのニュースの内容に即した具体的なタイトルにすること"""
 
 
+def _find_claude_cli() -> str:
+    """Windows/Mac両対応で claude CLI のフルパスを返す"""
+    import shutil
+    import platform
+    # まずPATH検索
+    found = shutil.which("claude") or shutil.which("claude.cmd")
+    if found:
+        return found
+    # フォールバック: 既知のnpmグローバル場所
+    if platform.system() == "Windows":
+        candidates = [
+            os.path.expandvars(r"%APPDATA%\npm\claude.cmd"),
+            os.path.expandvars(r"%APPDATA%\npm\claude.ps1"),
+        ]
+    else:
+        candidates = [
+            os.path.expanduser("~/.npm-global/bin/claude"),
+            "/usr/local/bin/claude",
+            "/opt/homebrew/bin/claude",
+        ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return "claude"  # 最終フォールバック
+
+
 def run_deep_research(articles: list[dict], history_summary: str = "") -> dict:
     """Claude CLI で記事を執筆する"""
     prompt = build_prompt(articles, history_summary=history_summary)
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
-    print("  Claude CLI で記事執筆中...")
+    claude_path = _find_claude_cli()
+    print(f"  Claude CLI で記事執筆中... ({claude_path})")
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
+        [claude_path, "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
         capture_output=True, text=True, timeout=600, env=env,
+        shell=False,
     )
     if result.returncode == 0 and result.stdout.strip():
         draft = result.stdout.strip()
