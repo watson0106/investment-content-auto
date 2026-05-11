@@ -48,25 +48,58 @@ def _save_status(status: dict) -> None:
 
 
 def get_magazine_id_via_api(driver) -> str | None:
-    """note APIでマガジンIDを取得"""
-    driver.set_script_timeout(15)
-    result = driver.execute_async_script("""
-        var done = arguments[arguments.length - 1];
-        fetch('/api/v1/me/magazines', {
-            credentials: 'same-origin',
-            headers: {'x-requested-with': 'XMLHttpRequest'}
-        })
-        .then(r => r.json().then(d => done({status: r.status, data: d})))
-        .catch(e => done({error: e.toString()}));
-    """)
-    if result and result.get("status") == 200:
-        magazines = result.get("data", {}).get("data", {}).get("magazines", [])
-        if magazines:
-            mag = magazines[0]
-            mag_id = mag.get("id") or mag.get("key")
-            print(f"  マガジン取得: id={mag_id} name={mag.get('name','')}")
-            return str(mag_id)
-    print(f"  [WARN] マガジンID取得失敗: {result}")
+    """note APIでマガジンIDを取得（空レスポンス時は再ログイン+リトライ）"""
+    driver.set_script_timeout(20)
+
+    for attempt in range(3):
+        result = driver.execute_async_script("""
+            var done = arguments[arguments.length - 1];
+            fetch('/api/v1/me/magazines', {
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'x-requested-with': 'XMLHttpRequest'
+                }
+            })
+            .then(function(r) {
+                return r.text().then(function(t) { done({status: r.status, text: t}); });
+            })
+            .catch(function(e) { done({error: e.toString()}); });
+        """) or {}
+
+        status = result.get("status")
+        text = (result.get("text") or "").strip()
+
+        if status == 200 and text:
+            try:
+                data = json.loads(text)
+                magazines = data.get("data", {}).get("magazines", [])
+                if magazines:
+                    mag = magazines[0]
+                    mag_id = mag.get("id") or mag.get("key")
+                    print(f"  マガジン取得: id={mag_id} name={mag.get('name','')}")
+                    return str(mag_id)
+                print(f"  [WARN] マガジン一覧が空 body={text[:200]}")
+                return None
+            except Exception as e:
+                print(f"  [WARN] マガジンJSON parse失敗 (attempt {attempt+1}/3): {e} body={text[:200]}")
+        else:
+            preview = text[:200] if text else "(empty body)"
+            print(f"  [WARN] マガジン取得失敗 (attempt {attempt+1}/3): status={status} body={preview}")
+            # 401/403 ならセッション失効。再ログインしてリトライ
+            if status in (401, 403) and attempt < 2:
+                try:
+                    import post_to_note
+                    from selenium.webdriver.support.ui import WebDriverWait
+                    print("  → セッション失効を検出、再ログインします")
+                    post_to_note.login(driver, WebDriverWait(driver, 20))
+                    driver.get("https://note.com/")
+                    time.sleep(3)
+                except Exception as e:
+                    print(f"  [WARN] 再ログイン失敗: {e}")
+
+        time.sleep(2)
+
     return None
 
 
@@ -165,8 +198,9 @@ def main() -> None:
     try:
         # note.comにログイン
         post_to_note.login(driver, wait)
+        # ログイン直後はSet-Cookieがdocument.cookieに反映されるまで少し待つ
         driver.get("https://note.com/")
-        time.sleep(2)
+        time.sleep(5)
 
         # マガジンIDを取得（キャッシュあれば使う）
         magazine_id = status.get("magazine_id")
