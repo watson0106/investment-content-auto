@@ -205,10 +205,12 @@ def run_deep_research(articles: list[dict], history_summary: str = "") -> dict:
 
     claude_path = _find_claude_cli()
     print(f"  Claude CLI で記事執筆中... ({claude_path})")
+    # Windows の cmd は ~32k 文字のコマンドライン長制限あり。長プロンプトは stdin 経由で渡す
     result = subprocess.run(
-        [claude_path, "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
+        [claude_path, "-p", "--output-format", "text", "--model", "claude-opus-4-6"],
+        input=prompt,
         capture_output=True, text=True, timeout=600, env=env,
-        shell=False,
+        shell=False, encoding="utf-8", errors="replace",
     )
     if result.returncode == 0 and result.stdout.strip():
         draft = result.stdout.strip()
