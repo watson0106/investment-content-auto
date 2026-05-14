@@ -42,7 +42,9 @@ RSS_SOURCES = [
 def fetch_feed(source: dict) -> list[dict]:
     """RSS フィードを取得してパース"""
     try:
-        feed = feedparser.parse(source["url"], request_headers=HEADERS)
+        resp = requests.get(source["url"], headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        feed = feedparser.parse(resp.content)
         articles = []
         cutoff = datetime.now(JST) - timedelta(hours=24)
 
@@ -58,6 +60,10 @@ def fetch_feed(source: dict) -> list[dict]:
             link    = entry.get("link", "")
             summary = BeautifulSoup(summary, "html.parser").get_text()[:500]
 
+            # 画像URLを抽出（media_thumbnail / media_content）
+            img_list = entry.get("media_thumbnail", entry.get("media_content", []))
+            image_url = img_list[0].get("url", "") if img_list else ""
+
             if title:
                 articles.append({
                     "source":    source["name"],
@@ -65,6 +71,7 @@ def fetch_feed(source: dict) -> list[dict]:
                     "summary":   summary,
                     "url":       link,
                     "published": published.isoformat() if published else "",
+                    "image_url": image_url,
                 })
         return articles
 
@@ -290,13 +297,43 @@ def interleave_by_source(articles: list[dict]) -> list[dict]:
     return result
 
 
+def _call_gemini_for_selection(prompt: str) -> str:
+    """Gemini APIでニュース選定（認証不要・cron安定）"""
+    api_key = os.environ.get("GEMINI_API_KEY", "") or os.environ.get("GEMINI_IMAGEN_API_KEY", "")
+    if not api_key:
+        env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+        if os.path.exists(env_path):
+            with open(env_path) as f:
+                for line in f:
+                    if line.startswith("GEMINI_API_KEY=") or line.startswith("GEMINI_IMAGEN_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip()
+                        if api_key:
+                            break
+    if not api_key:
+        return ""
+    try:
+        import google.genai as genai
+        client = genai.Client(api_key=api_key)
+        for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+            try:
+                response = client.models.generate_content(model=model_name, contents=prompt)
+                return response.text.strip() if response.text else ""
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"  [WARN] Gemini 選定エラー: {e}")
+    return ""
+
+
 def select_top_with_claude(articles: list[dict], top_n: int = 10, history_summary: str = "") -> list[dict]:
-    """Claude Sonnet で投資家にとって最も注目度の高い記事を選定"""
+    """Gemini APIで投資家にとって最も注目度の高い記事を選定"""
     # ソースごとにインターリーブして順番の偏りをなくす
     articles = interleave_by_source(articles)
+    # プロンプト長を抑えるため上位60件に絞る
+    articles = articles[:60]
 
     article_list = "\n".join(
-        f"{i+1}. [{a['source']}] {a['title']}\n   {a['summary'][:120]}"
+        f"{i+1}. [{a['source']}] {a['title']}"
         for i, a in enumerate(articles)
     )
 
@@ -329,35 +366,20 @@ def select_top_with_claude(articles: list[dict], top_n: int = 10, history_summar
 選んだ記事の番号をJSON配列で出力してください（例：[1, 3, 7, 12, 15]）。
 番号のみ、JSONのみ、説明不要。"""
 
-    try:
-        claude_cmd = None
-        for candidate in ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"]:
-            if os.path.exists(candidate):
-                claude_cmd = candidate
-                break
-        if claude_cmd is None:
-            r = subprocess.run(["which", "claude"], capture_output=True, text=True)
-            claude_cmd = r.stdout.strip() if r.returncode == 0 else None
-        if not claude_cmd:
-            return articles[:top_n]
-
-        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-        result = subprocess.run(
-            [claude_cmd, "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6"],
-            capture_output=True, text=True, timeout=60, env=env,
-        )
-        if result.returncode == 0:
-            text = result.stdout.strip()
-            match = re.search(r"\[[\d,\s]+\]", text)
-            if match:
+    text = _call_gemini_for_selection(prompt)
+    if text:
+        match = re.search(r"\[[\d,\s]+\]", text)
+        if match:
+            try:
                 indices = json.loads(match.group())
                 selected = [articles[i - 1] for i in indices if 1 <= i <= len(articles)]
                 if selected:
-                    print(f"  Claude 選定: {len(selected)} 件")
+                    print(f"  Gemini 選定: {len(selected)} 件")
                     return selected[:top_n]
-    except Exception as e:
-        print(f"  [WARN] Claude 選定失敗: {e}")
+            except Exception:
+                pass
 
+    print("  [WARN] Gemini 選定失敗 → スコア順フォールバック")
     return articles[:top_n]
 
 
@@ -382,10 +404,6 @@ def collect_and_rank(top_n: int = 10, history_summary: str = "") -> list[dict]:
     # Google トレンド JP（ログイン不要・公式RSS）
     print("  取得中: Google Trends JP")
     all_articles.extend(fetch_google_trends_jp())
-
-    # note トレンド（API）
-    print("  取得中: note トレンド")
-    all_articles.extend(fetch_note_trending())
 
     print(f"  取得合計: {len(all_articles)} 件")
 

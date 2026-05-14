@@ -168,12 +168,14 @@ def generate_paid_article_text(topic: dict, free_article_summary: str = "") -> s
     """Claude CLI で有料記事を生成（Gemini フォールバック付き）"""
     prompt = build_paid_prompt(topic, free_article_summary)
     env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + env.get("PATH", "/usr/bin:/bin")
 
     draft = ""
     if subprocess.run(["which", "claude"], capture_output=True).returncode == 0:
         print("  Claude CLI で有料記事執筆中...")
         result = subprocess.run(
-            ["claude", "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6"],
+            ["claude", "-p", prompt, "--output-format", "text", "--model", "claude-opus-4-6",
+             "--allowedTools", "none"],
             capture_output=True, text=True, timeout=600, env=env,
         )
         if result.returncode == 0 and result.stdout.strip():

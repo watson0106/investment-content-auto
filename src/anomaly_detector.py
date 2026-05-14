@@ -100,7 +100,7 @@ def check_posted_today() -> str | None:
     try:
         with open(POSTED_PATH, encoding="utf-8") as f:
             data = json.load(f)
-        posted_at = data.get("posted_at", "")
+        posted_at = data.get("posted_at", "") or data.get("saved_at", "")
         dt = _parse_dt(posted_at)
         today = datetime.datetime.now(JST).date()
         if dt.date() < today:

@@ -8,23 +8,24 @@ from __future__ import annotations
 import json
 import os
 import time
+from pathlib import Path
+from dotenv import load_dotenv
+
+_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+load_dotenv(os.path.join(_BASE, ".env"))
 
 NOTE_EMAIL    = os.environ["NOTE_EMAIL"]
 NOTE_PASSWORD = os.environ["NOTE_PASSWORD"]
-
-_BASE = os.path.join(os.path.dirname(__file__), "..")
 PROFILE_STATUS_PATH = os.path.join(_BASE, "data", "profile_status.json")
 
 # ─── プロフィール文 ───────────────────────────────────────────────
 PROFILE_TEXT = """投資歴15年の個人投資家。米国株×日本株のハイブリッド戦略で資産運用中。
 
-インデックス投資をベースに、決算・マクロを読んで個別株を上乗せするスタイルです。
+毎日夕方に「今日のマーケットで私が注目したこと」を無料で配信。ニュースの解説だけでなく、なぜそれが重要かまで書いています。
 
-毎朝7時に「今日のマーケットで私が注目したこと」を配信。ニュースの解説だけでなく、私自身の判断・ポジション・売買の考え方まで書いています。
+有料メンバーシップ（月980円・初月無料）では、私が実際に「買った銘柄・見送った銘柄・売った銘柄」とその理由をすべて公開しています。「何を買うか」より「なぜ買わないか」の判断こそが投資で負けない鍵だと思っています。
 
-週2回の有料記事では、私の実際の売買計画とシナリオ別の行動方針を公開しています（¥500/本）。
-
-「新聞よりも速く、証券会社のレポートよりも人間らしい投資情報を」をモットーに書いています。"""
+合わなければすぐ退会できます。まず1ヶ月試してみてください。"""
 
 PROFILE_NICKNAME = "TATSUJIN TRADE"
 
@@ -57,9 +58,86 @@ def mark_profile_updated() -> None:
 # ─── JS API方式でプロフィール更新 ─────────────────────────────────
 
 def update_profile_with_driver(driver, wait) -> bool:
-    """JS API方式でプロフィールを更新する。
-    note.comドメインにいる状態で /api/v1/me へPUTリクエストを送る。
-    """
+    """プロフィール設定ページのフォームを操作してプロフィールを更新する。"""
+    try:
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.common.keys import Keys
+        import platform
+
+        print("  プロフィール設定ページに移動中...")
+        driver.get("https://note.com/settings/profile")
+        time.sleep(4)
+
+        # プロフィール本文のテキストエリアを探す
+        profile_area = None
+        for sel in [
+            'textarea[name="profile"]',
+            'textarea[placeholder*="自己紹介"]',
+            'textarea[placeholder*="プロフィール"]',
+            '.o-creatorEditForm__profile textarea',
+            'textarea',
+        ]:
+            els = driver.find_elements(By.CSS_SELECTOR, sel)
+            if els:
+                profile_area = els[0]
+                print(f"  プロフィールエリア発見: {sel}")
+                break
+
+        if not profile_area:
+            print("  ❌ プロフィールエリアが見つかりません")
+            print(f"  現在URL: {driver.current_url}")
+            # フォールバック: API経由で試みる
+            return _update_profile_via_api(driver)
+
+        # テキスト入力
+        driver.execute_script("arguments[0].click();", profile_area)
+        time.sleep(0.5)
+        # 全選択して削除
+        if platform.system() == "Darwin":
+            from selenium.webdriver.common.action_chains import ActionChains
+            ActionChains(driver).key_down(Keys.COMMAND).send_keys('a').key_up(Keys.COMMAND).perform()
+        else:
+            from selenium.webdriver.common.action_chains import ActionChains
+            ActionChains(driver).key_down(Keys.CONTROL).send_keys('a').key_up(Keys.CONTROL).perform()
+        time.sleep(0.3)
+        profile_area.send_keys(Keys.DELETE)
+        time.sleep(0.3)
+        profile_area.clear()
+        profile_area.send_keys(PROFILE_TEXT)
+        time.sleep(1)
+
+        # 保存ボタンをクリック
+        saved = driver.execute_script("""
+            var btns = Array.from(document.querySelectorAll('button[type="submit"], button'));
+            for (var b of btns) {
+                var t = (b.textContent || '').trim();
+                if (t.includes('保存') || t.includes('更新') || t.includes('変更を保存')) {
+                    b.click();
+                    return t;
+                }
+            }
+            return null;
+        """)
+
+        if saved:
+            print(f"  「{saved}」ボタンクリック完了")
+            time.sleep(3)
+            print("  ✅ プロフィール更新成功（Selenium UI方式）")
+            return True
+        else:
+            print("  ❌ 保存ボタンが見つかりません")
+            return _update_profile_via_api(driver)
+
+    except Exception as e:
+        print(f"  ❌ Selenium UI更新失敗: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def _update_profile_via_api(driver) -> bool:
+    """APIフォールバック（JS fetch）"""
     try:
         # note.comドメインに遷移（ログイン済み状態）
         print("  note.comドメインに遷移中...")
@@ -178,7 +256,8 @@ def main() -> None:
 
     if not should_update_profile():
         print("  プロフィールは最近更新済み。スキップします")
-        return
+        if "--force" not in __import__("sys").argv:
+            return
 
     import post_to_note
     from selenium.webdriver.support.ui import WebDriverWait

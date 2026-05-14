@@ -79,8 +79,10 @@ def auto_proofread(text: str) -> str:
             return text
 
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + env.get("PATH", "/usr/bin:/bin")
         result = subprocess.run(
-            [claude_cmd, "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6"],
+            [claude_cmd, "-p", prompt, "--output-format", "text", "--model", "claude-sonnet-4-6",
+             "--allowedTools", "none"],
             capture_output=True, text=True, timeout=120, env=env,
         )
         if result.returncode == 0:

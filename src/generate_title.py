@@ -13,35 +13,66 @@ import subprocess
 
 def generate_titles(article_text: str) -> list[str]:
     """Claude CLI でタイトル候補を生成"""
-    prompt = f"""以下の投資深掘り記事に対して、note.com で多くの読者にクリック・保存されるタイトルを10案生成してください。
+    # strategy_state から直近の高スキタイトルを取得してプロンプトに反映
+    high_like_examples = ""
+    if strategy_state:
+        # パフォーマンスデータから直近スキ3以上のタイトルを取得
+        try:
+            import json as _json
+            perf_path = os.path.join(os.path.dirname(__file__), "..", "data", "article_performance.json")
+            with open(perf_path, encoding="utf-8") as _f:
+                perf_data = _json.load(_f)
+            top_titles = [
+                d["title"] for d in sorted(perf_data, key=lambda x: x.get("latest_likes",0), reverse=True)
+                if d.get("latest_likes",0) >= 3
+            ][:5]
+            if top_titles:
+                high_like_examples = "
+".join(f"- {t}" for t in top_titles)
+        except Exception:
+            pass
+
+    prompt = f"""以下の投資記事に対して、note.com でクリック・保存されるタイトルを10案生成してください。
+記事ごとにタイプを変えることが重要です（同じパターンを繰り返さない）。
 
 【記事冒頭（参考）】
 {article_text[:1500]}
 
-【タイトル設計のルール（重要度順）】
+【過去に実際に多くのスキを獲得したタイトル（この感覚を参考にする）】
+{high_like_examples if high_like_examples else "- サンリオ株が4年で6倍になった理由と、次に来る爆上げ材料
+- 【保存版】エントリーしてはいけない水準
+- Googleは次の10年も覇権を握れるか？"}
 
-1. **銘柄名・固有名詞を必ず入れる**
-   - 銘柄名・人名・企業名・指数名が入っているタイトルは3〜4倍クリックされる
-   - 例：「サンリオ」「NVIDIA」「FRB」「NISA」「日経平均」
+【今回生成する10案の内訳（必ずこの比率で）】
 
-2. **「逆張り」「意外性」「否定」型が最も強い**
-   - 「〇〇は終わった」「なぜ誰も言わないのか」「実は〇〇だった」
-   - 「〇〇の逆襲」「〇〇が6倍になった本当の理由」
-   - 例：「レーザーテックは終わった、と言う人に反論する」
+■ A型「長期ストーリー・大きな問い」（3案）
+- 「〇〇は次の10年も覇権を握れるか？」
+- 「〇〇が5年で化ける、たった1つの理由」
+- 「なぜ誰も言わないのか──〇〇の本当の実力」
 
-3. **保存したくなる「完全解説」型**
-   - 「【保存版】〇〇完全解説」「〇〇を完全予測」「〇〇の全真相」
+■ B型「保存版・手法・教訓」（2案）
+- 「【保存版】〇〇を買う前に知っておくべきこと」
+- 「私が〇〇で失敗した理由と、今なら絶対やること」
 
-4. **読者の行動を促す「今すぐ知るべき」型**
-   - 「〇〇が動く前に知っておくべきこと」「今週〇〇を買うか判断した理由」
+■ C型「逆張り・意外性・否定」（2案）
+- 「〇〇は終わった、と言う人に反論する」
+- 「〇〇が急落しても、私が売らない理由」
+- 「〇〇の逆襲──本当の上昇はこれからだ」
 
-5. **数字を入れると信頼感UP**
-   - 「4年で6倍」「-5%の真相」「+30%の根拠」
+■ D型「数字・具体的根拠」（2案）
+- 「〇〇が6倍になった4つの条件、今の株価に全部揃っている」
+- 「〇〇は2週間以内に動く、その根拠を示す」
 
-【禁止タイトル】
-- 「今日の投資ニュース速報」系（汎用的すぎてクリックされない）
-- 「〜まとめ」「〜解説」だけのシンプルすぎるもの
+■ E型「疑問形＋数字」（1案）
+- 「〇〇、今が買い時？──3つの指標で判断する」
+
+【禁止パターン（使わないこと）】
+- 「なぜ〇〇株は急伸/急落したのか？」→ このパターンは使い古されているため禁止
+- 「〇〇株が急騰した裏事情」→ 同様に禁止
+- 「今日の投資ニュース速報」系
 - 40字超え
+
+【重要】銘柄名・企業名・固有名詞を必ず入れること。「投資」だけの汎用タイトルは禁止。
 
 【出力形式】
 1. タイトル案1
@@ -60,7 +91,7 @@ def generate_titles(article_text: str) -> list[str]:
         print("  Claude CLI でタイトル生成中...")
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         result = subprocess.run(
-            [claude_path, "-p", prompt, "--output-format", "text"],
+            [claude_path, "-p", prompt, "--output-format", "text", "--allowedTools", "none"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, env=env
         )
         text = result.stdout.strip() if result.returncode == 0 else ""
@@ -122,12 +153,22 @@ def select_best_title(titles: list[str], strategy_state: dict = None) -> str:
         if re.search(r"\d", title):          s += 2.0   # 数字あり
         if "？" in title or "?" in title:    s += 1.5   # 疑問形
         if len(title) <= 35:                 s += 1.0   # 適切な長さ
-        if "私" in title or "なぜ" in title: s += 1.0   # 一人称・疑問
+        if "私" in title:                    s += 2.0   # 一人称（強い）
         keywords = ["米国株", "日本株", "FRB", "AI", "半導体", "ETF", "円", "株", "市場", "Fed",
                     "NVIDIA", "任天堂", "NISA", "利下げ", "利上げ", "円安", "円高"]
         for kw in keywords:
             if kw in title:
                 s += 0.5
+        # 高スキパターンにボーナス
+        high_like_patterns = ["保存版", "本当の理由", "たった1つ", "卒業", "逆襲", "正体", "治す", "結論"]
+        for pat in high_like_patterns:
+            if pat in title:
+                s += 2.0
+        # 「急伸」「急騰」「急落」パターンはペナルティ（使い古されている）
+        stale_patterns = ["急伸したのか", "急騰したのか", "急落したのか", "急伸した理由", "急騰した理由"]
+        for pat in stale_patterns:
+            if pat in title:
+                s -= 3.0
         # 過去に高スキだったパターンにボーナス
         for pattern in top_patterns:
             if "疑問形" in pattern and "？" in title: s += 1.0

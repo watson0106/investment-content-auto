@@ -42,6 +42,21 @@ def generate_image(prompt: str, path: str) -> str | None:
                     img_data = part.inline_data.data
                     with open(path, "wb") as f:
                         f.write(img_data)
+                    # 200KB超の場合はJPEG変換して圧縮（note投稿時のタイムアウト対策）
+                    if len(img_data) > 200 * 1024:
+                        try:
+                            from PIL import Image as _PIL_Image
+                            img_pil = _PIL_Image.open(path).convert("RGB")
+                            w, h = img_pil.size
+                            if w > 1200:
+                                new_h = int(h * 1200 / w)
+                                img_pil = img_pil.resize((1200, new_h), _PIL_Image.LANCZOS)
+                            img_pil.save(path, "JPEG", quality=85)
+                            with open(path, "rb") as f2:
+                                new_size = len(f2.read())
+                            print(f"    圧縮済み: {len(img_data)//1024}KB → {new_size//1024}KB (JPEG)")
+                        except Exception:
+                            pass
                     print(f"    生成完了 [{model}]: {os.path.basename(path)} ({len(img_data)//1024}KB)")
                     return path
         except Exception as e:
